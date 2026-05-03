@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Authn\Sdk\Http;
 
-final class ApiException extends Exception
+class ApiException extends Exception
 {
     /**
      * @param  list<array<string, mixed>>  $errors
@@ -30,6 +30,19 @@ final class ApiException extends Exception
     public function getErrors(): array
     {
         return $this->errors;
+    }
+
+    public function getErrorCode(): ?string
+    {
+        $first = $this->errors[0] ?? null;
+
+        if (! is_array($first)) {
+            return null;
+        }
+
+        $code = $first['code'] ?? null;
+
+        return is_string($code) ? $code : null;
     }
 
     public function getTraceId(): ?string

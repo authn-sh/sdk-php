@@ -1,0 +1,370 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "authn.sh API",
+    "version": "0.1.0-pre",
+    "summary": "Backend API (BAPI) and Frontend API (FAPI) for authn.sh.",
+    "description": "The authn.sh API has two surfaces:\n\n- **BAPI** (Backend API) — server-to-server. Authenticated with a workspace\n  secret key (`sk_test_…` / `sk_live_…`). Lives at `https://api.authn.sh/v1`.\n- **FAPI** (Frontend API) — browser-facing. Identifies a device via the\n  `__client` cookie set on the per-environment FAPI host\n  (`https://{env_slug}.authn.sh/v1`). Cross-origin XHR is enabled for\n  origins listed in the environment's allowlist.\n\nThis document is the source of truth for both surfaces. Every authn.sh SDK\n(`@authn.sh/sdk-js`, `@authn.sh/sdk-react`, `authn/sdk` PHP, …) generates\nits request and response types from the bundled artifact (`dist/openapi.bundled.json`).\n\nThe spec is split across `paths/` and `components/` for review-friendliness;\nthe bundler stitches everything together.\n",
+    "license": {
+      "name": "AGPL-3.0-only",
+      "identifier": "AGPL-3.0-only"
+    },
+    "contact": {
+      "name": "authn.sh",
+      "url": "https://authn.sh"
+    },
+    "termsOfService": "https://authn.sh/terms"
+  },
+  "servers": [
+    {
+      "url": "https://api.authn.sh/v1",
+      "description": "Production BAPI (workspace-scoped, server-to-server)."
+    },
+    {
+      "url": "https://{env_slug}.authn.sh/v1",
+      "description": "Production FAPI (per-environment, browser-facing).",
+      "variables": {
+        "env_slug": {
+          "default": "example",
+          "description": "The slug of the environment whose FAPI you're addressing. Each\n`Environment` row gets a unique slug at creation; production envs use\n`<project_slug>`, development envs use `<project_slug>-dev`.\n"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "bearer_secret_key": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Users",
+      "description": "End-user identities."
+    },
+    {
+      "name": "Email Addresses",
+      "description": "User-owned email identifiers and their verification state."
+    },
+    {
+      "name": "Sessions",
+      "description": "Live authenticated sessions across devices."
+    },
+    {
+      "name": "Sign-Ins",
+      "description": "In-progress sign-in attempts (FAPI state machine)."
+    },
+    {
+      "name": "Sign-Ups",
+      "description": "In-progress sign-up attempts (FAPI state machine)."
+    },
+    {
+      "name": "Me",
+      "description": "Authenticated end-user's view of themselves (FAPI)."
+    },
+    {
+      "name": "Client",
+      "description": "Per-device state container (FAPI)."
+    },
+    {
+      "name": "Environment",
+      "description": "Public per-environment configuration consumed at SDK boot (FAPI)."
+    },
+    {
+      "name": "Organizations",
+      "description": "Organizations within an environment. Populated in v0.2."
+    },
+    {
+      "name": "Org Memberships",
+      "description": "User ↔ organization joins. Populated in v0.2."
+    },
+    {
+      "name": "Org Invitations",
+      "description": "Pending invitations to join an organization. Populated in v0.2."
+    },
+    {
+      "name": "Org Domains",
+      "description": "Verified domains attached to an organization. Populated in v0.2."
+    },
+    {
+      "name": "Invitations",
+      "description": "Application-level (non-organization) invitations."
+    },
+    {
+      "name": "Allowlist Identifiers",
+      "description": "Identifier patterns allowed to sign up under restricted mode."
+    },
+    {
+      "name": "Blocklist Identifiers",
+      "description": "Identifier patterns refused at sign-up."
+    },
+    {
+      "name": "Redirect URLs",
+      "description": "URLs allowed as post-flow redirect targets."
+    },
+    {
+      "name": "Instance",
+      "description": "Per-environment settings (`InstanceSetting`)."
+    },
+    {
+      "name": "Webhooks",
+      "description": "Webhook endpoints, deliveries, and the event envelope."
+    },
+    {
+      "name": "JWKS / OIDC",
+      "description": "Public keys and OIDC discovery served per-environment on the FAPI host."
+    }
+  ],
+  "paths": {},
+  "components": {
+    "securitySchemes": {
+      "bearer_secret_key": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "secret_key",
+        "description": "Workspace-scoped secret key. Format: `sk_test_<…>` or `sk_live_<…>`.\nResolves to a single `Environment`. Issued and rotated from the\nDashboard or `POST /v1/api_keys` (post-v0.1).\n"
+      },
+      "client_cookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__client",
+        "description": "FAPI device cookie. HttpOnly, `SameSite=Lax`, `Secure` in production.\nIssued by `GET /v1/client` on first contact. Identifies the `Client`\nrow across requests on its FAPI host.\n"
+      },
+      "dev_browser_jwt": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "__authn_db_jwt",
+        "description": "Cross-origin development fallback for FAPI. When the SDK runs against a\ndev FAPI host that can't set a SameSite=Lax cookie cross-site (no\nHTTPS), it sends this query-string JWT instead. Production never uses\nthis.\n"
+      }
+    },
+    "schemas": {
+      "Id": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_]{0,9}_[0-9A-HJKMNP-TV-Z]{26}$",
+        "description": "A prefixed ULID. The prefix indicates the resource type\n(`user_`, `org_`, `sess_`, `env_`, …); the suffix is a 26-character\nCrockford-base32 ULID.\n",
+        "examples": [
+          "user_01HKX9SY9V7H7TF8C8K7J9X4ZB",
+          "sess_01HKX9SY9V7H7TF8C8K7J9X4ZC"
+        ]
+      },
+      "Timestamp": {
+        "type": "integer",
+        "format": "int64",
+        "minimum": 0,
+        "description": "Unix timestamp in milliseconds."
+      },
+      "Metadata": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Free-form JSON object attached to a resource.\n\nThree flavours exist:\n\n- `public_metadata` — readable everywhere; writable only via BAPI.\n- `private_metadata` — readable only via BAPI; never returned to FAPI;\n  never logged or embedded in JWT claims unless an explicit\n  `JwtTemplate` references it (post-v0.7).\n- `unsafe_metadata` — readable everywhere; writable from FAPI by the\n  end user themselves.\n"
+      },
+      "PaginatedList": {
+        "type": "object",
+        "required": [
+          "data",
+          "total_count"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {}
+          },
+          "total_count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "description": "Total number of rows matching the filter, ignoring `limit`/`offset`."
+          }
+        },
+        "description": "Wrapper for paginated list endpoints. Concrete responses use `allOf` to\nnarrow `data[]` to the specific resource schema.\n"
+      },
+      "Error": {
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "long_message"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Stable machine-readable code. SDKs match on this string; never\nparse `message` or `long_message`.\n",
+            "examples": [
+              "form_password_incorrect",
+              "verification_expired",
+              "rate_limit_exceeded"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "description": "Short, human-readable summary."
+          },
+          "long_message": {
+            "type": "string",
+            "description": "Long-form, end-user-friendly message including next-step guidance.\nSafe to render in the UI.\n"
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Per-code structured context (param name, attempt count, retry-after, …)."
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "errors"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "errors": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/components/schemas/Error"
+            }
+          },
+          "trace_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Server-generated request id. Same value goes into the audit log and\ninto the `X-Authn-Request-Id` response header, so customers can\npaste it back to support.\n",
+            "examples": [
+              "req_01HKX9SY9V7H7TF8C8K7J9X4ZD"
+            ]
+          }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Validation or shape error.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Missing or invalid credential.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Authenticated but not authorized for the action.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Resource does not exist (or is not visible to the caller).",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "State conflict — e.g. an `Idempotency-Key` reuse with a different request body.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "UnprocessableEntity": {
+        "description": "Domain-level validation failure.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Rate limit exhausted; consult `Retry-After`.",
+        "headers": {
+          "Retry-After": {
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Seconds until the next token in the bucket."
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "LimitParam": {
+        "name": "limit",
+        "in": "query",
+        "description": "Maximum rows to return. Default `10`, maximum `500`.",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500,
+          "default": 10
+        }
+      },
+      "OffsetParam": {
+        "name": "offset",
+        "in": "query",
+        "description": "Rows to skip before returning results.",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        }
+      },
+      "OrderByParam": {
+        "name": "order_by",
+        "in": "query",
+        "description": "Sort key prefixed with `+` (ascending) or `-` (descending). Per-resource\nendpoints document the allowed keys.\n",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "examples": [
+            "+created_at",
+            "-last_active_at"
+          ]
+        }
+      },
+      "IdempotencyKeyHeader": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "description": "Caller-supplied UUID for `POST` mutations. The server caches the response\nfor 24 hours; replays with the same key return the cached response without\nre-executing. A different request body under the same key returns `409`.\n",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 255
+        }
+      }
+    }
+  }
+}
