@@ -64,7 +64,7 @@ composer pint       # code style check
 composer pint:fix   # apply fixes
 ```
 
-CI runs the full suite on PHP 8.2 and 8.3.
+CI runs the full suite on PHP 8.2, 8.3, 8.4, and 8.5.
 
 ## License
 
