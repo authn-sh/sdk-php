@@ -185,7 +185,20 @@ final class TokenVerifier
     private function findKey(JWKSet $jwks, ?string $kid): ?JWK
     {
         if ($kid === null) {
-            return $jwks->count() === 1 ? $jwks->selectKey('sig') ?? $jwks->all()[array_key_first($jwks->all())] : null;
+            if ($jwks->count() !== 1) {
+                return null;
+            }
+
+            $key = $jwks->selectKey('sig');
+            if ($key !== null) {
+                return $key;
+            }
+
+            foreach ($jwks->all() as $jwk) {
+                return $jwk;
+            }
+
+            return null;
         }
 
         try {
