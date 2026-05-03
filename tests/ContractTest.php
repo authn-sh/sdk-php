@@ -61,9 +61,19 @@ it('declares operations for every BAPI endpoint the SDK calls', function (): voi
         ['PATCH', '/v1/instance/restrictions'],
     ];
 
+    $missing = [];
     foreach ($expected as [$method, $path]) {
-        expect($paths)->toHaveKey($path, "Expected path {$path} to be documented in the OpenAPI spec.");
-        $verbs = is_array($paths[$path] ?? null) ? array_change_key_case($paths[$path], CASE_LOWER) : [];
-        expect($verbs)->toHaveKey(strtolower($method), "Expected {$method} on {$path}.");
+        $pathItem = $paths[$path] ?? null;
+        if (! is_array($pathItem)) {
+            $missing[] = "path {$path}";
+
+            continue;
+        }
+        $verbs = array_change_key_case($pathItem, CASE_LOWER);
+        if (! array_key_exists(strtolower($method), $verbs)) {
+            $missing[] = "{$method} on {$path}";
+        }
     }
+
+    expect($missing)->toBe([], 'Missing from OpenAPI spec: ' . implode(', ', $missing));
 });
