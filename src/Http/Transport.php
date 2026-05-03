@@ -6,6 +6,7 @@ namespace Authn\Sdk\Http;
 
 use Authn\Sdk\Config;
 use Authn\Sdk\Util\Json;
+use Authn\Sdk\Util\Query;
 use Authn\Sdk\Util\Uuid;
 use Http\Discovery\Psr17FactoryDiscovery;
 use Http\Discovery\Psr18ClientDiscovery;
@@ -24,6 +25,8 @@ use Psr\Log\NullLogger;
  * @phpstan-type Options array{
  *     query?: array<string, scalar|null|array<int, scalar|null>>,
  *     body?: array<int|string, mixed>,
+ *     rawBody?: string,
+ *     contentType?: string,
  *     headers?: array<string, string>,
  *     idempotencyKey?: string|null,
  * }
@@ -53,7 +56,7 @@ final class Transport
 
     /**
      * @param  Options  $options
-     * @return array<int|string, mixed>
+     * @return array<string, mixed>
      *
      * @throws ApiException
      * @throws NetworkException
@@ -73,12 +76,6 @@ final class Transport
             $request = $request->withHeader('Idempotency-Key', $options['idempotencyKey']);
         }
 
-        if (isset($options['headers'])) {
-            foreach ($options['headers'] as $name => $value) {
-                $request = $request->withHeader($name, $value);
-            }
-        }
-
         if (isset($options['body'])) {
             try {
                 $payload = Json::encode($options['body']);
@@ -88,6 +85,17 @@ final class Transport
             $request = $request
                 ->withHeader('Content-Type', 'application/json')
                 ->withBody($this->streamFactory->createStream($payload));
+        } elseif (isset($options['rawBody'])) {
+            $contentType = $options['contentType'] ?? 'application/octet-stream';
+            $request = $request
+                ->withHeader('Content-Type', $contentType)
+                ->withBody($this->streamFactory->createStream($options['rawBody']));
+        }
+
+        if (isset($options['headers'])) {
+            foreach ($options['headers'] as $name => $value) {
+                $request = $request->withHeader($name, $value);
+            }
         }
 
         $startedAt = microtime(true);
@@ -97,7 +105,7 @@ final class Transport
         } catch (ClientExceptionInterface $e) {
             $this->logger->warning('authn.sh request failed', [
                 'method' => $method,
-                'uri' => (string) $uri,
+                'uri' => $uri,
                 'error' => $e->getMessage(),
             ]);
             throw new NetworkException('Network error contacting authn.sh: ' . $e->getMessage(), 0, $e);
@@ -108,7 +116,7 @@ final class Transport
 
         $this->logger->info('authn.sh request', [
             'method' => $method,
-            'uri' => (string) $uri,
+            'uri' => $uri,
             'status' => $status,
             'duration_ms' => $durationMs,
         ]);
@@ -133,15 +141,17 @@ final class Transport
         $path = '/' . ltrim($path, '/');
         $uri = $base . $path;
 
-        if ($query === []) {
+        $queryString = Query::build($query);
+        if ($queryString === '') {
             return $uri;
         }
 
-        return $uri . '?' . http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+        return $uri . '?' . $queryString;
     }
 
     private function buildApiException(ResponseInterface $response): ApiException
     {
+        $status = $response->getStatusCode();
         $rawBody = (string) $response->getBody();
         $decoded = Json::decode($rawBody);
 
@@ -162,14 +172,40 @@ final class Transport
 
         $message = $errors !== [] && isset($errors[0]['message']) && is_string($errors[0]['message'])
             ? $errors[0]['message']
-            : sprintf('authn.sh API request failed with HTTP %d', $response->getStatusCode());
+            : sprintf('authn.sh API request failed with HTTP %d', $status);
 
-        return new ApiException(
-            message: $message,
-            statusCode: $response->getStatusCode(),
-            errors: $errors,
-            traceId: $traceId,
-            rawBody: $rawBody,
-        );
+        return match ($status) {
+            401 => new AuthenticationException($message, $status, $errors, $traceId, $rawBody),
+            404 => new ResourceNotFoundException($message, $status, $errors, $traceId, $rawBody),
+            429 => new RateLimitExceededException(
+                $message,
+                $status,
+                $errors,
+                $traceId,
+                $rawBody,
+                $this->parseRetryAfter($response),
+            ),
+            default => new ApiException($message, $status, $errors, $traceId, $rawBody),
+        };
+    }
+
+    private function parseRetryAfter(ResponseInterface $response): int
+    {
+        $header = $response->getHeaderLine('Retry-After');
+
+        if ($header === '') {
+            return 0;
+        }
+
+        if (ctype_digit($header)) {
+            return (int) $header;
+        }
+
+        $timestamp = strtotime($header);
+        if ($timestamp === false) {
+            return 0;
+        }
+
+        return max(0, $timestamp - time());
     }
 }

@@ -17,7 +17,12 @@ final class Json
     }
 
     /**
-     * @return array<int|string, mixed>
+     * Decode a JSON object body into a string-keyed array.
+     *
+     * Returns an empty array on empty input, invalid JSON, or non-object payloads
+     * (e.g. a JSON array, scalar, or null). All authn.sh API responses are objects.
+     *
+     * @return array<string, mixed>
      */
     public static function decode(string $value): array
     {
@@ -31,6 +36,11 @@ final class Json
             return [];
         }
 
-        return is_array($decoded) ? $decoded : [];
+        if (! is_array($decoded) || array_is_list($decoded)) {
+            return [];
+        }
+
+        /** @var array<string, mixed> $decoded */
+        return $decoded;
     }
 }
