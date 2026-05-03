@@ -1,6 +1,6 @@
 # authn-sh/sdk-php
 
-PHP backend SDK for [authn.sh](https://authn.sh) — call the Backend API (BAPI), verify session JWTs, and verify webhook signatures from server-side PHP. Ships with a thin Laravel package layer.
+PHP backend SDK for [authn.sh](https://authn.sh) — call the Backend API (BAPI), verify session JWTs, and verify webhook signatures from server-side PHP. The Laravel integration lives in the separate [`authn-sh/sdk-php-laravel`](https://github.com/authn-sh/sdk-php-laravel) package.
 
 > Status: **0.1.x pre-release.** APIs may change before `1.0`.
 
@@ -8,6 +8,7 @@ PHP backend SDK for [authn.sh](https://authn.sh) — call the Backend API (BAPI)
 
 - PHP **8.2+**
 - A PSR-18 HTTP client (Guzzle, Symfony HttpClient, etc.) and PSR-17 factories. The SDK auto-discovers them via [`php-http/discovery`](https://docs.php-http.org/en/latest/discovery.html), so installing `guzzlehttp/guzzle` (or any PSR-18 client) is enough.
+- A PSR-16 cache (optional, for the JWT verifier). Without one the JWKS document is re-fetched on every verify.
 
 ## Install
 
@@ -21,7 +22,7 @@ If you don't already have a PSR-18 client in your project:
 composer require guzzlehttp/guzzle
 ```
 
-## Usage
+## BAPI client
 
 ```php
 use Authn\Sdk\Client;
@@ -29,9 +30,11 @@ use Authn\Sdk\Client;
 $client = new Client(secretKey: $_ENV['AUTHN_SECRET_KEY']);
 
 $user = $client->users()->get('user_2x4yT…');
+$session = $client->sessions()->revoke('sess_…');
+$invite = $client->invitations()->create(['email_address' => 'a@b.com']);
 ```
 
-Resource managers (`users()`, `sessions()`, `invitations()`, `allowlistIdentifiers()`, `blocklistIdentifiers()`, `redirectUrls()`, `instance()`, `webhookEndpoints()`) are wired up in this release; their full method bodies land in the next milestone.
+Resource managers: `users()`, `sessions()`, `invitations()`, `allowlistIdentifiers()`, `blocklistIdentifiers()`, `redirectUrls()`, `instance()`, `webhookEndpoints()`.
 
 ### Custom HTTP client / logger
 
@@ -49,10 +52,58 @@ $client = new Client(
 
 ### Errors
 
-The transport throws:
+- `Authn\Sdk\Http\ApiException` — non-2xx responses; `getStatusCode()`, `getErrors()`, `getErrorCode()`, `getTraceId()`, `getRawBody()`.
+- `Authn\Sdk\Http\AuthenticationException` (401), `Authn\Sdk\Http\ResourceNotFoundException` (404), `Authn\Sdk\Http\RateLimitExceededException` (429, with `getRetryAfter()`).
+- `Authn\Sdk\Http\NetworkException` — connection-level failures.
 
-- `Authn\Sdk\Http\ApiException` for non-2xx responses, with `getStatusCode()`, `getErrors()` (the parsed `errors[]` envelope), `getTraceId()`, and `getRawBody()`.
-- `Authn\Sdk\Http\NetworkException` for connection-level failures.
+## Verify a session JWT
+
+```php
+use Authn\Sdk\Tokens\TokenVerifier;
+use Authn\Sdk\Tokens\TokenInvalidException;
+
+$verifier = new TokenVerifier(
+    publishableKey: $_ENV['AUTHN_PUBLISHABLE_KEY'], // pk_test_… / pk_live_…
+    cache: $psr16Cache,                              // optional PSR-16 cache for JWKS
+);
+
+try {
+    $claims = $verifier->verify($jwt);                 // throws TokenInvalidException
+    // or: $claims = $verifier->tryVerify($jwt);       // returns null on failure
+
+    $userId = $claims->sub;       // user_…
+    $sessionId = $claims->sid;    // sess_…
+} catch (TokenInvalidException $e) {
+    // 401 the request
+}
+
+// Optional: enforce origin binding via the azp claim.
+$claims = $verifier->verify($jwt, expectedAzp: ['https://app.acme.com']);
+```
+
+The verifier fetches the FAPI JWKS once and caches it (PSR-16). On an unknown `kid` it refreshes the JWKS once before failing.
+
+## Verify a webhook
+
+```php
+use Authn\Sdk\Webhooks\SignatureVerifier;
+use Authn\Sdk\Webhooks\SignatureInvalidException;
+
+// One signing secret, or many during a rotation overlap window.
+$verifier = new SignatureVerifier($_ENV['AUTHN_WEBHOOK_SECRET']);
+
+try {
+    $event = $verifier->verify($rawBody, $request->getHeaders()); // throws SignatureInvalidException
+
+    if ($event->type === 'user.created') {
+        // $event->data carries the resource payload
+    }
+} catch (SignatureInvalidException $e) {
+    // 401 the request
+}
+```
+
+Replay protection is on by default with a 5-minute tolerance — pass `toleranceSeconds:` to widen or narrow it.
 
 ## Development
 
