@@ -42,7 +42,7 @@ final class InstanceManager extends Manager
      */
     public function updateOrganizationSettings(array $patch): array
     {
-        return $this->transport->send('PATCH', '/v1/instance/organization_settings', [
+        return $this->transport->send('PATCH', '/v1/instance/organization-settings', [
             'body' => $patch,
         ]);
     }

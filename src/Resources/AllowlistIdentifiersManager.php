@@ -8,7 +8,7 @@ final class AllowlistIdentifiersManager extends Manager
 {
     public function list(?ListParams $params = null): PaginatedList
     {
-        $payload = $this->transport->send('GET', '/v1/allowlist_identifiers', [
+        $payload = $this->transport->send('GET', '/v1/allowlist-identifiers', [
             'query' => ($params ?? new ListParams)->toQuery(),
         ]);
 
@@ -21,13 +21,13 @@ final class AllowlistIdentifiersManager extends Manager
      */
     public function create(array $data): array
     {
-        return $this->transport->send('POST', '/v1/allowlist_identifiers', [
+        return $this->transport->send('POST', '/v1/allowlist-identifiers', [
             'body' => $data,
         ]);
     }
 
     public function delete(string $id): void
     {
-        $this->transport->send('DELETE', '/v1/allowlist_identifiers/' . rawurlencode($id));
+        $this->transport->send('DELETE', '/v1/allowlist-identifiers/' . rawurlencode($id));
     }
 }

@@ -110,7 +110,7 @@ final class UsersManager extends Manager
             . $bytes . "\r\n"
             . "--{$boundary}--\r\n";
 
-        return $this->transport->send('POST', '/v1/users/' . rawurlencode($userId) . '/profile_image', [
+        return $this->transport->send('POST', '/v1/users/' . rawurlencode($userId) . '/profile-image', [
             'rawBody' => $body,
             'contentType' => "multipart/form-data; boundary={$boundary}",
         ]);
@@ -118,7 +118,7 @@ final class UsersManager extends Manager
 
     public function deleteProfileImage(string $userId): void
     {
-        $this->transport->send('DELETE', '/v1/users/' . rawurlencode($userId) . '/profile_image');
+        $this->transport->send('DELETE', '/v1/users/' . rawurlencode($userId) . '/profile-image');
     }
 
     /**
@@ -136,7 +136,7 @@ final class UsersManager extends Manager
     {
         $payload = $this->transport->send(
             'POST',
-            '/v1/users/' . rawurlencode($userId) . '/verify_password',
+            '/v1/users/' . rawurlencode($userId) . '/verify-password',
             ['body' => ['password' => $password]],
         );
 
@@ -157,7 +157,7 @@ final class UsersManager extends Manager
     {
         $payload = $this->transport->send(
             'GET',
-            '/v1/users/' . rawurlencode($userId) . '/organization_memberships',
+            '/v1/users/' . rawurlencode($userId) . '/organization-memberships',
         );
 
         return PaginatedList::fromResponse($payload);
@@ -167,7 +167,7 @@ final class UsersManager extends Manager
     {
         $payload = $this->transport->send(
             'GET',
-            '/v1/users/' . rawurlencode($userId) . '/organization_invitations',
+            '/v1/users/' . rawurlencode($userId) . '/organization-invitations',
         );
 
         return PaginatedList::fromResponse($payload);
@@ -183,7 +183,7 @@ final class UsersManager extends Manager
     {
         return $this->transport->send(
             'GET',
-            '/v1/users/' . rawurlencode($userId) . '/oauth_access_tokens/' . rawurlencode($provider),
+            '/v1/users/' . rawurlencode($userId) . '/oauth-access-tokens/' . rawurlencode($provider),
         );
     }
 }

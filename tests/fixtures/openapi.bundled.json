@@ -973,7 +973,7 @@
         }
       }
     },
-    "/v1/users/{user_id}/profile_image": {
+    "/v1/users/{user_id}/profile-image": {
       "parameters": [
         {
           "name": "user_id",
@@ -1159,7 +1159,7 @@
         }
       }
     },
-    "/v1/users/{user_id}/verify_password": {
+    "/v1/users/{user_id}/verify-password": {
       "parameters": [
         {
           "name": "user_id",
@@ -3820,7 +3820,7 @@
         }
       }
     },
-    "/v1/allowlist_identifiers": {
+    "/v1/allowlist-identifiers": {
       "get": {
         "operationId": "listAllowlistIdentifiers",
         "summary": "List allowlist identifiers",
@@ -3940,7 +3940,7 @@
         }
       }
     },
-    "/v1/allowlist_identifiers/{identifier_id}": {
+    "/v1/allowlist-identifiers/{identifier_id}": {
       "parameters": [
         {
           "name": "identifier_id",
@@ -3971,7 +3971,7 @@
         }
       }
     },
-    "/v1/blocklist_identifiers": {
+    "/v1/blocklist-identifiers": {
       "get": {
         "operationId": "listBlocklistIdentifiers",
         "summary": "List blocklist identifiers",
@@ -4084,7 +4084,7 @@
         }
       }
     },
-    "/v1/blocklist_identifiers/{identifier_id}": {
+    "/v1/blocklist-identifiers/{identifier_id}": {
       "parameters": [
         {
           "name": "identifier_id",
@@ -4115,7 +4115,7 @@
         }
       }
     },
-    "/v1/redirect_urls": {
+    "/v1/redirect-urls": {
       "get": {
         "operationId": "listRedirectUrls",
         "summary": "List redirect URLs",
@@ -4229,7 +4229,7 @@
         }
       }
     },
-    "/v1/redirect_urls/{redirect_url_id}": {
+    "/v1/redirect-urls/{redirect_url_id}": {
       "parameters": [
         {
           "name": "redirect_url_id",
@@ -4492,7 +4492,7 @@
         }
       }
     },
-    "/v1/instance/organization_settings": {
+    "/v1/instance/organization-settings": {
       "patch": {
         "operationId": "updateOrganizationSettings",
         "summary": "Patch organization settings (v0.2 placeholder)",
@@ -6811,7 +6811,7 @@
       },
       "OrganizationSettingsUpdateRequest": {
         "type": "object",
-        "description": "Placeholder body for `PATCH /v1/instance/organization_settings`.\nv0.1 only accepts `enabled: false`; the full schema lands in v0.2.\n",
+        "description": "Placeholder body for `PATCH /v1/instance/organization-settings`.\nv0.1 only accepts `enabled: false`; the full schema lands in v0.2.\n",
         "additionalProperties": true,
         "properties": {
           "enabled": {

@@ -138,7 +138,7 @@ it('verifyPassword unwraps the verified flag', function (): void {
     expect($m->verifyPassword('user_1', 'wrong'))->toBeFalse();
 
     expect((string) $mock->requestAt(0)->getBody())->toBe('{"password":"correct"}');
-    expect((string) $mock->requestAt(0)->getUri())->toEndWith('/v1/users/user_1/verify_password');
+    expect((string) $mock->requestAt(0)->getUri())->toEndWith('/v1/users/user_1/verify-password');
 });
 
 it('listSessions returns a PaginatedList', function (): void {
@@ -160,7 +160,7 @@ it('listOrganizationMemberships hits the correct path', function (): void {
     expect($list)->toBeInstanceOf(PaginatedList::class);
     expect($list->totalCount)->toBe(1);
     expect((string) $mock->lastRequest()->getUri())
-        ->toEndWith('/v1/users/user_1/organization_memberships');
+        ->toEndWith('/v1/users/user_1/organization-memberships');
 });
 
 it('listOrganizationInvitations hits the correct path', function (): void {
@@ -172,7 +172,7 @@ it('listOrganizationInvitations hits the correct path', function (): void {
     expect($list)->toBeInstanceOf(PaginatedList::class);
     expect($list->totalCount)->toBe(1);
     expect((string) $mock->lastRequest()->getUri())
-        ->toEndWith('/v1/users/user_1/organization_invitations');
+        ->toEndWith('/v1/users/user_1/organization-invitations');
 });
 
 it('getOauthAccessToken raises ResourceNotFoundException on a v0.1 BAPI', function (): void {
@@ -181,7 +181,7 @@ it('getOauthAccessToken raises ResourceNotFoundException on a v0.1 BAPI', functi
 
     expect(fn () => $m->getOauthAccessToken('user_1', 'google'))->toThrow(ResourceNotFoundException::class);
     expect((string) $mock->lastRequest()->getUri())
-        ->toEndWith('/v1/users/user_1/oauth_access_tokens/google');
+        ->toEndWith('/v1/users/user_1/oauth-access-tokens/google');
 });
 
 it('updateMetadata sends a PATCH to /metadata', function (): void {

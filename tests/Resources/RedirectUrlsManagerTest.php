@@ -20,6 +20,6 @@ it('manages redirect URLs', function (): void {
 
     expect($mock->requestAt(1)->getMethod())->toBe('POST');
     expect((string) $mock->requestAt(1)->getBody())->toBe('{"url":"https://app/cb"}');
-    expect((string) $mock->requestAt(2)->getUri())->toEndWith('/v1/redirect_urls/rurl_1');
+    expect((string) $mock->requestAt(2)->getUri())->toEndWith('/v1/redirect-urls/rurl_1');
     expect($mock->requestAt(3)->getMethod())->toBe('DELETE');
 });

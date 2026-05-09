@@ -22,5 +22,5 @@ it('reads and updates instance settings', function (): void {
     expect((string) $mock->requestAt(0)->getUri())->toEndWith('/v1/instance');
     expect($mock->requestAt(1)->getMethod())->toBe('PATCH');
     expect((string) $mock->requestAt(2)->getUri())->toEndWith('/v1/instance/restrictions');
-    expect((string) $mock->requestAt(3)->getUri())->toEndWith('/v1/instance/organization_settings');
+    expect((string) $mock->requestAt(3)->getUri())->toEndWith('/v1/instance/organization-settings');
 });
