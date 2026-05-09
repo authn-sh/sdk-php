@@ -9,6 +9,7 @@ use Authn\Sdk\Resources\AllowlistIdentifiersManager;
 use Authn\Sdk\Resources\BlocklistIdentifiersManager;
 use Authn\Sdk\Resources\InstanceManager;
 use Authn\Sdk\Resources\InvitationsManager;
+use Authn\Sdk\Resources\OrganizationsManager;
 use Authn\Sdk\Resources\RedirectUrlsManager;
 use Authn\Sdk\Resources\SessionsManager;
 use Authn\Sdk\Resources\UsersManager;
@@ -86,5 +87,10 @@ final class Client
     public function webhookEndpoints(): WebhookEndpointsManager
     {
         return new WebhookEndpointsManager($this->transport);
+    }
+
+    public function organizations(): OrganizationsManager
+    {
+        return new OrganizationsManager($this->transport);
     }
 }

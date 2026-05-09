@@ -153,25 +153,24 @@ final class UsersManager extends Manager
         return PaginatedList::fromResponse($payload);
     }
 
-    /**
-     * Organizations land in v0.2 — the SDK surface exists today, it returns an empty
-     * list until the BAPI ships the underlying endpoint.
-     */
     public function listOrganizationMemberships(string $userId): PaginatedList
     {
-        unset($userId);
+        $payload = $this->transport->send(
+            'GET',
+            '/v1/users/' . rawurlencode($userId) . '/organization_memberships',
+        );
 
-        return PaginatedList::empty();
+        return PaginatedList::fromResponse($payload);
     }
 
-    /**
-     * Organizations land in v0.2 — see listOrganizationMemberships.
-     */
     public function listOrganizationInvitations(string $userId): PaginatedList
     {
-        unset($userId);
+        $payload = $this->transport->send(
+            'GET',
+            '/v1/users/' . rawurlencode($userId) . '/organization_invitations',
+        );
 
-        return PaginatedList::empty();
+        return PaginatedList::fromResponse($payload);
     }
 
     /**
