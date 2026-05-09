@@ -4,6 +4,9 @@
 
 ### Added
 
+- `RolesManager` — `list`, `create`, `get`, `update`, `delete`, `setPermissions`. Accessible via `$client->roles()`.
+- `PermissionsManager` — `list` (read-only). Accessible via `$client->permissions()`.
+- `SystemPermissions` constants for all 12 system permission keys (e.g. `SystemPermissions::ORG_SYS_PROFILE_MANAGE`).
 - `OrganizationsManager` — `list`, `create`, `get`, `update`, `delete`, `members`, `invitations`, `domains`.
 - `OrganizationMembershipsManager` — `list`, `create`, `update`, `delete`. Accessible via `$client->organizations()->members($orgId)`.
 - `OrganizationInvitationsManager` — `list`, `create`, `bulkCreate`, `revoke`. Accessible via `$client->organizations()->invitations($orgId)`.

@@ -78,6 +78,13 @@ it('declares operations for every BAPI endpoint the SDK calls', function (): voi
         ['PATCH', '/v1/organizations/{organization_id}/domains/{domain_id}'],
         ['DELETE', '/v1/organizations/{organization_id}/domains/{domain_id}'],
         ['POST', '/v1/organizations/{organization_id}/domains/{domain_id}/verify'],
+        ['GET', '/v1/roles'],
+        ['POST', '/v1/roles'],
+        ['GET', '/v1/roles/{role_id}'],
+        ['PATCH', '/v1/roles/{role_id}'],
+        ['DELETE', '/v1/roles/{role_id}'],
+        ['PUT', '/v1/roles/{role_id}/permissions'],
+        ['GET', '/v1/permissions'],
     ];
 
     $missing = [];
