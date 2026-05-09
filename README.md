@@ -34,7 +34,7 @@ $session = $client->sessions()->revoke('sess_…');
 $invite = $client->invitations()->create(['email_address' => 'a@b.com']);
 ```
 
-Resource managers: `users()`, `sessions()`, `invitations()`, `allowlistIdentifiers()`, `blocklistIdentifiers()`, `redirectUrls()`, `instance()`, `webhookEndpoints()`, `organizations()`.
+Resource managers: `users()`, `sessions()`, `invitations()`, `allowlistIdentifiers()`, `blocklistIdentifiers()`, `redirectUrls()`, `instance()`, `webhookEndpoints()`, `organizations()`, `roles()`, `permissions()`.
 
 Organization sub-managers are accessed via `$client->organizations()`:
 
@@ -64,6 +64,23 @@ $invites->revoke('orginv_…');
 $domains = $orgs->domains('org_…');
 $domains->create('acme.com');
 $domains->verify('orgdmn_…');
+```
+
+### Roles and permissions
+
+```php
+use Authn\Sdk\Resources\SystemPermissions;
+
+// Custom roles
+$role = $client->roles()->create(['name' => 'Billing Admin', 'key' => 'org:billing_admin']);
+$client->roles()->setPermissions($role['id'], [
+    SystemPermissions::ORG_SYS_BILLING_READ,
+    SystemPermissions::ORG_SYS_BILLING_MANAGE,
+]);
+$client->roles()->delete($role['id']);
+
+// Read the permissions catalog
+$perms = $client->permissions()->list();
 ```
 
 ### Custom HTTP client / logger
