@@ -17,10 +17,10 @@ it('Allowlist: list / create / delete', function (): void {
     $m->create(['identifier' => 'a@b.com']);
     $m->delete('allow_1');
 
-    expect((string) $mock->requestAt(0)->getUri())->toEndWith('/v1/allowlist_identifiers');
+    expect((string) $mock->requestAt(0)->getUri())->toEndWith('/v1/allowlist-identifiers');
     expect($mock->requestAt(1)->getMethod())->toBe('POST');
     expect($mock->requestAt(2)->getMethod())->toBe('DELETE');
-    expect((string) $mock->requestAt(2)->getUri())->toEndWith('/v1/allowlist_identifiers/allow_1');
+    expect((string) $mock->requestAt(2)->getUri())->toEndWith('/v1/allowlist-identifiers/allow_1');
 });
 
 it('Blocklist: list / create / delete', function (): void {
@@ -34,7 +34,7 @@ it('Blocklist: list / create / delete', function (): void {
     $m->create(['identifier' => 'a@b.com']);
     $m->delete('block_1');
 
-    expect((string) $mock->requestAt(0)->getUri())->toEndWith('/v1/blocklist_identifiers');
+    expect((string) $mock->requestAt(0)->getUri())->toEndWith('/v1/blocklist-identifiers');
     expect($mock->requestAt(1)->getMethod())->toBe('POST');
-    expect((string) $mock->requestAt(2)->getUri())->toEndWith('/v1/blocklist_identifiers/block_1');
+    expect((string) $mock->requestAt(2)->getUri())->toEndWith('/v1/blocklist-identifiers/block_1');
 });

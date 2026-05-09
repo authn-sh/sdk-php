@@ -8,7 +8,7 @@ final class RedirectUrlsManager extends Manager
 {
     public function list(?ListParams $params = null): PaginatedList
     {
-        $payload = $this->transport->send('GET', '/v1/redirect_urls', [
+        $payload = $this->transport->send('GET', '/v1/redirect-urls', [
             'query' => ($params ?? new ListParams)->toQuery(),
         ]);
 
@@ -20,7 +20,7 @@ final class RedirectUrlsManager extends Manager
      */
     public function create(string $url): array
     {
-        return $this->transport->send('POST', '/v1/redirect_urls', [
+        return $this->transport->send('POST', '/v1/redirect-urls', [
             'body' => ['url' => $url],
         ]);
     }
@@ -30,11 +30,11 @@ final class RedirectUrlsManager extends Manager
      */
     public function get(string $id): array
     {
-        return $this->transport->send('GET', '/v1/redirect_urls/' . rawurlencode($id));
+        return $this->transport->send('GET', '/v1/redirect-urls/' . rawurlencode($id));
     }
 
     public function delete(string $id): void
     {
-        $this->transport->send('DELETE', '/v1/redirect_urls/' . rawurlencode($id));
+        $this->transport->send('DELETE', '/v1/redirect-urls/' . rawurlencode($id));
     }
 }
