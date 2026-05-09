@@ -74,8 +74,8 @@ use Authn\Sdk\Resources\SystemPermissions;
 // Custom roles
 $role = $client->roles()->create(['name' => 'Billing Admin', 'key' => 'org:billing_admin']);
 $client->roles()->setPermissions($role['id'], [
-    SystemPermissions::ORG_SYS_BILLING_READ,
-    SystemPermissions::ORG_SYS_BILLING_MANAGE,
+    SystemPermissions::ORG_SYS_ROLES_READ,
+    SystemPermissions::ORG_SYS_ROLES_MANAGE,
 ]);
 $client->roles()->delete($role['id']);
 
@@ -145,10 +145,10 @@ if ($claims->organization !== null) {
     $org->id;          // 'org_…'
     $org->slug;        // 'acme' or null
     $org->role;        // 'org:admin' or null
-    $org->permissions; // ['org:sys_billing:read', …]
+    $org->permissions; // ['org:sys_profile:read', …]
 
     $org->hasRole('org:admin');
-    $org->hasPermission(SystemPermissions::ORG_SYS_BILLING_READ);
+    $org->hasPermission(SystemPermissions::ORG_SYS_PROFILE_READ);
 }
 
 // Convenience shortcuts directly on VerifiedClaims:
