@@ -197,8 +197,8 @@ it('populates organization from the JWT org claim with correct fields', function
     $claims['org'] = [
         'id' => 'org_2',
         'slg' => 'beta-corp',
-        'rol' => 'org:billing_admin',
-        'per' => ['org:sys_billing:read', 'org:sys_billing:manage'],
+        'rol' => 'org:member',
+        'per' => ['org:sys_profile:read', 'org:sys_memberships:read'],
     ];
 
     $verified = $verifier->verify($fixture->sign($claims));
@@ -207,12 +207,12 @@ it('populates organization from the JWT org claim with correct fields', function
     expect($org)->toBeInstanceOf(Organization::class);
     expect($org?->id)->toBe('org_2');
     expect($org?->slug)->toBe('beta-corp');
-    expect($org?->role)->toBe('org:billing_admin');
-    expect($org?->permissions)->toBe(['org:sys_billing:read', 'org:sys_billing:manage']);
+    expect($org?->role)->toBe('org:member');
+    expect($org?->permissions)->toBe(['org:sys_profile:read', 'org:sys_memberships:read']);
 
-    expect($verified->hasRole('org:billing_admin'))->toBeTrue();
+    expect($verified->hasRole('org:member'))->toBeTrue();
     expect($verified->hasRole('org:admin'))->toBeFalse();
-    expect($verified->hasPermission('org:sys_billing:read'))->toBeTrue();
+    expect($verified->hasPermission('org:sys_profile:read'))->toBeTrue();
     expect($verified->hasPermission('org:sys_profile:manage'))->toBeFalse();
 });
 
