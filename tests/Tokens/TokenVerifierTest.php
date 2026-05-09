@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Authn\Sdk\Tests\Support\JwtFixture;
 use Authn\Sdk\Tests\Support\MemoryCache;
 use Authn\Sdk\Tests\Support\StaticBodyClient;
+use Authn\Sdk\Tokens\Organization;
 use Authn\Sdk\Tokens\TokenInvalidException;
 use Authn\Sdk\Tokens\TokenVerifier;
 
@@ -173,8 +174,70 @@ it('parses actor and org claims when present', function (): void {
     $verified = $verifier->verify($fixture->sign($claims));
 
     expect($verified->actor)->toBe(['iss' => 'https://acme.authn.sh', 'sub' => 'user_admin', 'sid' => 'sess_admin']);
+
+    // deprecated array alias still works
     $org = $verified->org;
     expect($org)->not->toBeNull();
     expect($org)->toMatchArray(['id' => 'org_1', 'slg' => 'acme', 'rol' => 'admin']);
     expect($org['per'] ?? null)->toBe(['users:read', 'users:write']);
+
+    // typed value object
+    expect($verified->organization)->toBeInstanceOf(Organization::class);
+    expect($verified->organization?->id)->toBe('org_1');
+    expect($verified->organization?->slug)->toBe('acme');
+    expect($verified->organization?->role)->toBe('admin');
+    expect($verified->organization?->permissions)->toBe(['users:read', 'users:write']);
+});
+
+it('populates organization from the JWT org claim with correct fields', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $claims = validClaims();
+    $claims['org'] = [
+        'id' => 'org_2',
+        'slg' => 'beta-corp',
+        'rol' => 'org:billing_admin',
+        'per' => ['org:sys_billing:read', 'org:sys_billing:manage'],
+    ];
+
+    $verified = $verifier->verify($fixture->sign($claims));
+    $org = $verified->organization;
+
+    expect($org)->toBeInstanceOf(Organization::class);
+    expect($org?->id)->toBe('org_2');
+    expect($org?->slug)->toBe('beta-corp');
+    expect($org?->role)->toBe('org:billing_admin');
+    expect($org?->permissions)->toBe(['org:sys_billing:read', 'org:sys_billing:manage']);
+
+    expect($verified->hasRole('org:billing_admin'))->toBeTrue();
+    expect($verified->hasRole('org:admin'))->toBeFalse();
+    expect($verified->hasPermission('org:sys_billing:read'))->toBeTrue();
+    expect($verified->hasPermission('org:sys_profile:manage'))->toBeFalse();
+});
+
+it('organization is null and hasRole/hasPermission return false when org claim absent', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $verified = $verifier->verify($fixture->sign(validClaims()));
+
+    expect($verified->organization)->toBeNull();
+    expect($verified->hasRole('admin'))->toBeFalse();
+    expect($verified->hasPermission('org:sys_profile:manage'))->toBeFalse();
+});
+
+it('permissions array is deduped while preserving order', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $claims = validClaims();
+    $claims['org'] = [
+        'id' => 'org_3',
+        'per' => ['perm:a', 'perm:b', 'perm:a', 'perm:c'],
+    ];
+
+    $verified = $verifier->verify($fixture->sign($claims));
+
+    expect($verified->organization?->permissions)->toBe(['perm:a', 'perm:b', 'perm:c']);
 });

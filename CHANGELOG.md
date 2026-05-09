@@ -4,6 +4,9 @@
 
 ### Added
 
+- `Organization` value object (`id`, `slug`, `role`, `permissions`) with `hasRole()` / `hasPermission()` helpers.
+- `VerifiedClaims->organization` typed as `?Organization`, populated from JWT `org` claim. The deprecated `?array $org` alias is preserved for one minor version.
+- `VerifiedClaims::hasRole(string $key)` / `::hasPermission(string $key)` convenience methods.
 - `RolesManager` — `list`, `create`, `get`, `update`, `delete`, `setPermissions`. Accessible via `$client->roles()`.
 - `PermissionsManager` — `list` (read-only). Accessible via `$client->permissions()`.
 - `SystemPermissions` constants for all 12 system permission keys (e.g. `SystemPermissions::ORG_SYS_PROFILE_MANAGE`).

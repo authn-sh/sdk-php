@@ -258,6 +258,7 @@ final class TokenVerifier
         $actor = isset($claims['act']) && is_array($claims['act']) ? $this->normalizeActor($claims['act']) : null;
         /** @var array{id: string, slg?: string, rol?: string, per?: array<int, string>}|null $org */
         $org = isset($claims['org']) && is_array($claims['org']) ? $this->normalizeOrg($claims['org']) : null;
+        $organization = $org !== null ? $this->buildOrganization($org) : null;
 
         return new VerifiedClaims(
             sub: $sub,
@@ -271,6 +272,7 @@ final class TokenVerifier
             org: $org,
             wasTest: isset($claims['was_test']) && $claims['was_test'] === true,
             raw: $claims,
+            organization: $organization,
         );
     }
 
@@ -319,6 +321,22 @@ final class TokenVerifier
         }
 
         return $out;
+    }
+
+    /**
+     * @param  array{id: string, slg?: string, rol?: string, per?: array<int, string>}  $org
+     */
+    private function buildOrganization(array $org): Organization
+    {
+        /** @var list<string> $permissions */
+        $permissions = array_values(array_unique($org['per'] ?? []));
+
+        return new Organization(
+            id: $org['id'],
+            slug: $org['slg'] ?? null,
+            role: $org['rol'] ?? null,
+            permissions: $permissions,
+        );
     }
 
     private function cacheKey(): string
