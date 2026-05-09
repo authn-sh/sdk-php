@@ -151,14 +151,28 @@ it('listSessions returns a PaginatedList', function (): void {
     expect((string) $mock->lastRequest()->getUri())->toEndWith('/v1/users/user_1/sessions');
 });
 
-it('returns an empty list for organization endpoints (orgs land in v0.2)', function (): void {
-    $mock = new MockTransport;
+it('listOrganizationMemberships hits the correct path', function (): void {
+    $mock = (new MockTransport)->enqueue(body: ['data' => [['id' => 'mem_1']], 'total_count' => 1]);
     $m = new UsersManager($mock->transport());
 
-    expect($m->listOrganizationMemberships('user_1'))->toBeInstanceOf(PaginatedList::class)
-        ->and($m->listOrganizationMemberships('user_1')->totalCount)->toBe(0);
-    expect($m->listOrganizationInvitations('user_1')->totalCount)->toBe(0);
-    expect($mock->requests)->toHaveCount(0);
+    $list = $m->listOrganizationMemberships('user_1');
+
+    expect($list)->toBeInstanceOf(PaginatedList::class);
+    expect($list->totalCount)->toBe(1);
+    expect((string) $mock->lastRequest()->getUri())
+        ->toEndWith('/v1/users/user_1/organization_memberships');
+});
+
+it('listOrganizationInvitations hits the correct path', function (): void {
+    $mock = (new MockTransport)->enqueue(body: ['data' => [['id' => 'inv_1']], 'total_count' => 1]);
+    $m = new UsersManager($mock->transport());
+
+    $list = $m->listOrganizationInvitations('user_1');
+
+    expect($list)->toBeInstanceOf(PaginatedList::class);
+    expect($list->totalCount)->toBe(1);
+    expect((string) $mock->lastRequest()->getUri())
+        ->toEndWith('/v1/users/user_1/organization_invitations');
 });
 
 it('getOauthAccessToken raises ResourceNotFoundException on a v0.1 BAPI', function (): void {

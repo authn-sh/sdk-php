@@ -34,7 +34,37 @@ $session = $client->sessions()->revoke('sess_…');
 $invite = $client->invitations()->create(['email_address' => 'a@b.com']);
 ```
 
-Resource managers: `users()`, `sessions()`, `invitations()`, `allowlistIdentifiers()`, `blocklistIdentifiers()`, `redirectUrls()`, `instance()`, `webhookEndpoints()`.
+Resource managers: `users()`, `sessions()`, `invitations()`, `allowlistIdentifiers()`, `blocklistIdentifiers()`, `redirectUrls()`, `instance()`, `webhookEndpoints()`, `organizations()`.
+
+Organization sub-managers are accessed via `$client->organizations()`:
+
+```php
+$orgs = $client->organizations();
+
+// Org CRUD
+$org  = $orgs->create(['name' => 'Acme', 'slug' => 'acme']);
+$org  = $orgs->get('org_…');
+$orgs->update('org_…', ['name' => 'Acme Corp']);
+$orgs->delete('org_…');
+
+// Memberships
+$members = $orgs->members('org_…');
+$members->list();
+$members->create(['user_id' => 'user_…', 'role' => 'basic_member']);
+$members->update('user_…', 'admin');
+$members->delete('user_…');
+
+// Invitations
+$invites = $orgs->invitations('org_…');
+$invites->create(['email_address' => 'a@b.com', 'role' => 'basic_member']);
+$invites->bulkCreate([['email_address' => 'a@b.com'], ['email_address' => 'c@d.com']]);
+$invites->revoke('orginv_…');
+
+// Domains
+$domains = $orgs->domains('org_…');
+$domains->create('acme.com');
+$domains->verify('orgdmn_…');
+```
 
 ### Custom HTTP client / logger
 
