@@ -130,6 +130,32 @@ $claims = $verifier->verify($jwt, expectedAzp: ['https://app.acme.com']);
 
 The verifier fetches the FAPI JWKS once and caches it (PSR-16). On an unknown `kid` it refreshes the JWKS once before failing.
 
+### Organization claim
+
+When the session JWT carries an `org` claim, `$claims->organization` is populated as a typed `Organization` object:
+
+```php
+use Authn\Sdk\Resources\SystemPermissions;
+
+$claims = $verifier->verify($jwt);
+
+if ($claims->organization !== null) {
+    $org = $claims->organization;
+
+    $org->id;          // 'org_…'
+    $org->slug;        // 'acme' or null
+    $org->role;        // 'org:admin' or null
+    $org->permissions; // ['org:sys_billing:read', …]
+
+    $org->hasRole('org:admin');
+    $org->hasPermission(SystemPermissions::ORG_SYS_BILLING_READ);
+}
+
+// Convenience shortcuts directly on VerifiedClaims:
+$claims->hasRole('org:admin');
+$claims->hasPermission(SystemPermissions::ORG_SYS_PROFILE_MANAGE);
+```
+
 ## Verify a webhook
 
 ```php

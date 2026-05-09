@@ -8,7 +8,7 @@ final class VerifiedClaims
 {
     /**
      * @param  array{iss: string, sub: string, sid: string}|null  $actor  impersonation chain
-     * @param  array{id: string, slg?: string, rol?: string, per?: array<int, string>}|null  $org  v0.2 organization claims
+     * @param  array{id: string, slg?: string, rol?: string, per?: array<int, string>}|null  $org  deprecated: use $organization
      * @param  array<string, mixed>  $raw
      */
     public function __construct(
@@ -23,5 +23,16 @@ final class VerifiedClaims
         public readonly ?array $org,
         public readonly bool $wasTest,
         public readonly array $raw,
+        public readonly ?Organization $organization = null,
     ) {}
+
+    public function hasRole(string $key): bool
+    {
+        return $this->organization !== null && $this->organization->hasRole($key);
+    }
+
+    public function hasPermission(string $key): bool
+    {
+        return $this->organization !== null && $this->organization->hasPermission($key);
+    }
 }
