@@ -275,15 +275,8 @@
                               "id": "idn_01HKX9SY9V7H7TF8C8K7J9X4ZE",
                               "object": "email_address",
                               "email_address": "jane@acme.com",
-                              "verification": {
-                                "status": "verified",
-                                "strategy": "email_code",
-                                "attempts": 1,
-                                "expire_at": null,
-                                "external_verification_redirect_url": null,
-                                "nonce": null,
-                                "error": null
-                              },
+                              "verified": true,
+                              "current_challenge_id": null,
                               "linked_to": [],
                               "reserved": false,
                               "created_at": 1714723200000,
@@ -414,15 +407,8 @@
                           "id": "idn_01HKX9SY9V7H7TF8C8K7J9X4ZE",
                           "object": "email_address",
                           "email_address": "jane@acme.com",
-                          "verification": {
-                            "status": "verified",
-                            "strategy": "email_code",
-                            "attempts": 0,
-                            "expire_at": null,
-                            "external_verification_redirect_url": null,
-                            "nonce": null,
-                            "error": null
-                          },
+                          "verified": true,
+                          "current_challenge_id": null,
                           "linked_to": [],
                           "reserved": false,
                           "created_at": 1714723200000,
@@ -680,15 +666,8 @@
                           "id": "idn_01HKX9SY9V7H7TF8C8K7J9X4ZE",
                           "object": "email_address",
                           "email_address": "jane@acme.com",
-                          "verification": {
-                            "status": "verified",
-                            "strategy": "email_code",
-                            "attempts": 1,
-                            "expire_at": null,
-                            "external_verification_redirect_url": null,
-                            "nonce": null,
-                            "error": null
-                          },
+                          "verified": true,
+                          "current_challenge_id": null,
                           "linked_to": [],
                           "reserved": false,
                           "created_at": 1714723200000,
@@ -1255,7 +1234,7 @@
       "post": {
         "operationId": "createEmailAddress",
         "summary": "Create an email address",
-        "description": "Attach a new email address to a user. By default the address is\ncreated unverified and a verification challenge is issued (email\ncode). Pass `verified: true` to skip the challenge — the BAPI is\nprivileged.\n",
+        "description": "Attach a new email address to a user. By default the address is\ncreated unverified and `current_challenge_id` is `null` — the\ncaller follows up with the challenge sub-resource on FAPI to\nverify it. Pass `verified: true` to mint it already verified —\nthe BAPI is privileged.\n",
         "tags": [
           "Email Addresses"
         ],
@@ -1306,15 +1285,8 @@
                       "id": "idn_01HKX9SY9V7H7TF8C8K7J9X4ZE",
                       "object": "email_address",
                       "email_address": "jane.alt@acme.com",
-                      "verification": {
-                        "status": "unverified",
-                        "strategy": "email_code",
-                        "attempts": 0,
-                        "expire_at": 1714724000000,
-                        "external_verification_redirect_url": null,
-                        "nonce": null,
-                        "error": null
-                      },
+                      "verified": false,
+                      "current_challenge_id": null,
                       "linked_to": [],
                       "reserved": false,
                       "created_at": 1714723200000,
@@ -2905,7 +2877,7 @@
       "post": {
         "operationId": "createOrganizationDomain",
         "summary": "Add a domain to an organization",
-        "description": "Add a new domain. Verification is issued lazily — call\n`POST /v1/organizations/{id}/domains/{domain_id}/verify` to\nkick off the proof flow.\n",
+        "description": "Add a new domain. Verification is issued lazily — call\n`POST /v1/organizations/{id}/domains/{domain_id}/challenges` to\nkick off the proof flow.\n",
         "tags": [
           "Org Domains"
         ],
@@ -2923,11 +2895,10 @@
               },
               "examples": {
                 "basic": {
-                  "summary": "Add acme.com with DNS verification",
+                  "summary": "Add acme.com",
                   "value": {
                     "name": "acme.com",
-                    "enrollment_mode": "automatic_invitation",
-                    "verification_strategy": "dns"
+                    "enrollment_mode": "automatic_invitation"
                   }
                 }
               }
@@ -3082,7 +3053,7 @@
         }
       }
     },
-    "/v1/organizations/{organization_id}/domains/{domain_id}/verify": {
+    "/v1/organizations/{organization_id}/domains/{domain_id}/challenges": {
       "parameters": [
         {
           "name": "organization_id",
@@ -3104,19 +3075,186 @@
         }
       ],
       "post": {
-        "operationId": "verifyOrganizationDomain",
-        "summary": "Issue or re-issue a verification challenge",
-        "description": "Issue (or re-issue) the proof challenge attached to the\ndomain. The actual DNS record check is performed asynchronously\nby a worker; the response returns the current `Verification`\nstate immediately, and `verified` flips to `true` once the\ncheck passes (a subsequent `getOrganizationDomain` reflects\nthe result).\n\nCalling this on an already-verified domain re-issues a fresh\nchallenge — useful when the operator rotates a TXT record.\n",
+        "operationId": "createOrganizationDomainChallenge",
+        "summary": "Create a verification challenge on an organization domain",
+        "description": "Issue a verification challenge against the parent domain. Replaces\nthe old one-shot `POST /v1/organizations/{org}/domains/{id}/verify`\naction with the same uniform challenge sub-resource shape used on\nsign-in / sign-up / email-address verification — and adds a clean\npolling story for the asynchronous DNS lookup.\n\nLegal strategies are `domain_dns_txt` (the server returns the TXT\nvalue the operator must publish in `nonce`, then a background\nworker polls DNS until the record appears) and `email_code` (the\nserver emails a numeric code to `affiliation_email_address`).\n\nIssuing a new challenge supersedes any previous live challenge on\nthe same domain — the old one rolls to `expired`. Calling this on\nan already-verified domain rotates the proof and flips\n`verified` back to `false` until the new challenge succeeds.\n",
+        "tags": [
+          "Org Domains"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChallengeCreateRequest"
+              },
+              "examples": {
+                "dns_txt": {
+                  "summary": "DNS TXT challenge",
+                  "value": {
+                    "strategy": "domain_dns_txt"
+                  }
+                },
+                "email_code": {
+                  "summary": "Affiliation-email code",
+                  "value": {
+                    "strategy": "email_code"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The freshly-created `Challenge`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Challenge"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organization_id}/domains/{domain_id}/challenges/{challenge_id}": {
+      "parameters": [
+        {
+          "name": "organization_id",
+          "in": "path",
+          "required": true,
+          "description": "ID of the organization.",
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        {
+          "name": "domain_id",
+          "in": "path",
+          "required": true,
+          "description": "ID of the domain.",
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        {
+          "name": "challenge_id",
+          "in": "path",
+          "required": true,
+          "description": "ID of the challenge.",
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getOrganizationDomainChallenge",
+        "summary": "Get a verification challenge on an organization domain",
+        "description": "Fetch the focused `Challenge` resource. Used to poll the live\nstatus of an asynchronous DNS lookup for `domain_dns_txt`\nchallenges — the background worker flips `status` to `verified`\nonce the TXT record is visible, or `expired` once `expire_at`\npasses without a successful lookup.\n",
         "tags": [
           "Org Domains"
         ],
         "responses": {
           "200": {
-            "description": "The domain with the freshly-issued verification challenge.",
+            "description": "The current state of the challenge.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/OrganizationDomain"
+                  "$ref": "#/components/schemas/Challenge"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/v1/organizations/{organization_id}/domains/{domain_id}/challenges/{challenge_id}/answer": {
+      "parameters": [
+        {
+          "name": "organization_id",
+          "in": "path",
+          "required": true,
+          "description": "ID of the organization.",
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        {
+          "name": "domain_id",
+          "in": "path",
+          "required": true,
+          "description": "ID of the domain.",
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        },
+        {
+          "name": "challenge_id",
+          "in": "path",
+          "required": true,
+          "description": "ID of the challenge.",
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "answerOrganizationDomainChallenge",
+        "summary": "Answer a verification challenge on an organization domain",
+        "description": "Submit the operator's answer to a live domain-verification\nchallenge. The body shape is strategy-specific — see\n`ChallengeAnswerRequest`.\n\nFor `domain_dns_txt` send `{ }` (empty body) — this hints the\nserver to attempt the DNS lookup right now. The response reflects\nthe immediate result: `status: verified` if the TXT record was\nvisible, `status: pending` if the lookup was queued. The server\nkeeps polling DNS in the background regardless, so callers can\npoll `getOrganizationDomainChallenge` to observe the eventual\nflip.\n\nFor `email_code` send `{ code: \"…\" }` with the numeric code the\nserver delivered to `affiliation_email_address`.\n\nOn success the challenge `status` flips to `verified` and the\nparent domain flips to `verified: true` with\n`current_challenge_id` cleared.\n",
+        "tags": [
+          "Org Domains"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChallengeAnswerRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated `Challenge`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Challenge"
                 }
               }
             }
@@ -5278,37 +5416,100 @@
           }
         }
       },
-      "Verification": {
+      "Challenge": {
         "type": "object",
-        "description": "The state of a verification challenge attached to an identifier\n(`EmailAddress`, eventually `PhoneNumber`, …) or an in-progress\n`SignInAttempt` / `SignUpAttempt` factor.\n\n`status` is the consumer-visible lifecycle. `strategy` records\n*how* the challenge is being completed; the set of allowed strategies\ngrows with each milestone.\n",
+        "description": "A single verification challenge bound to a parent resource — a `SignIn`,\n`SignUp`, `EmailAddress`, or `OrganizationDomain`. The parent owns at\nmost one live challenge at a time (`current_challenge_id`). Challenges\nreplace the per-parent `prepare-*` / `attempt-*` / `verify` action\npairs with a uniform sub-resource shape: create the challenge, then\nanswer it (or poll it for out-of-band strategies like `email_link`\nor `domain_dns_txt`).\n\n### Parent reference\n\nExactly one of `sign_in_id`, `sign_up_id`, `email_address_id`,\n`organization_domain_id` is non-null per Challenge — the others are\n`null`. The non-null pointer identifies the parent resource the\nchallenge is verifying. The set of legal `strategy` values is\nparent-specific:\n\n- `SignIn` — `password`, `email_code`, `email_link`,\n  `reset_password_email_code`, `ticket`, `transfer`.\n- `SignUp` — `email_code`, `email_link`, `ticket`, `transfer`.\n- `EmailAddress` — `email_code`, `email_link`. Used by FAPI\n  `/v1/me/email-addresses/{id}/challenges` to verify additional\n  addresses on an already-signed-in user.\n- `OrganizationDomain` — `domain_dns_txt`, `email_code`. Used by\n  BAPI `/v1/organizations/{org}/domains/{id}/challenges` to prove\n  operator control of a domain.\n\n### Lifecycle\n\n- `pending` — challenge issued, no successful answer yet.\n- `verified` — challenge succeeded; the parent advances its state.\n- `transferable` — succeeded against the wrong flow type. The SDK\n  should bounce to the opposite flow with `transfer: true`. v0.2\n  cases (sign-in / sign-up only):\n    1. **Magic-link sign-in for an unknown identifier** — bounce to\n       sign-up via `POST /v1/client/sign-ups { transfer: true }`.\n    2. **Magic-link sign-up for an existing identifier** — bounce to\n       sign-in via `POST /v1/client/sign-ins { transfer: true }`.\n- `failed` — too many wrong attempts; the challenge can no longer be\n  answered. Issue a fresh one to retry.\n- `expired` — `expire_at` is in the past; issue a fresh one.\n\n### Cross-device polling (magic link)\n\n`email_link` is the only sign-in/sign-up strategy that completes\nout-of-band. The click can land on a different device than the one\ndriving the flow, so the originating device polls the focused\nchallenge resource:\n\n1. `POST /sign-ins/{sid}/challenges { strategy: \"email_link\", ... }` —\n   server emails a click-through URL of shape\n   `https://{env_slug}.authn.sh/v1/client/handshake?__authn_ticket=<jwt>&__authn_status=complete`,\n   mirrors that URL into `external_verification_redirect_url`, and\n   returns a polling token in `nonce`.\n2. `POST /sign-ins/{sid}/challenges/{cid}/answer { }` — body has no\n   strategy-specific fields; this commits the SDK to polling but does\n   not synchronously verify anything.\n3. The originating device polls `GET /sign-ins/{sid}/challenges/{cid}`\n   (recommended cadence: every 2s for 60s, then 5s for 5min, then stop).\n   Each poll returns the same `Challenge` until the link is clicked.\n4. The click — possibly on another device — hits `clientHandshake`\n   (`GET /v1/client/handshake?__authn_ticket=…`), which decodes the\n   ticket and flips the challenge to `verified` (or `transferable` for\n   an unknown identifier). The next poll on the originating device\n   sees the new status and completes the flow.\n\nPolling does *not* use SSE or WebSockets — plain HTTP polling keeps the\nFAPI infrastructure simple and works in every browser. Servers may\nrate-limit polling above the recommended cadence (`429`).\n\n### Async DNS verification (`domain_dns_txt`)\n\n`domain_dns_txt` is the strategy for organization-domain proof. The\nflow mirrors magic link in shape but is admin-driven:\n\n1. `POST /organizations/{org}/domains/{did}/challenges { strategy: \"domain_dns_txt\" }`\n   mints a Challenge with `nonce` set to the TXT value the operator\n   must publish under `_authn-challenge.<domain>`. Status starts\n   `pending`.\n2. `POST .../challenges/{cid}/answer { }` (empty body) tells the\n   server to attempt the DNS lookup right now. Returns the\n   Challenge with `status: pending` (the lookup was queued and\n   the record was not yet visible) or `status: verified` (the\n   lookup succeeded synchronously). The server also keeps polling\n   DNS in the background regardless of this hint.\n3. `GET .../challenges/{cid}` polling reflects the live status —\n   it flips to `verified` once the background DNS job confirms,\n   or `expired` once `expire_at` passes without a successful lookup.\n",
         "required": [
-          "status",
+          "id",
+          "object",
+          "sign_in_id",
+          "sign_up_id",
+          "email_address_id",
+          "organization_domain_id",
+          "step",
           "strategy",
-          "attempts"
+          "status",
+          "attempts",
+          "expire_at",
+          "nonce",
+          "external_verification_redirect_url",
+          "error",
+          "created_at",
+          "updated_at"
         ],
         "additionalProperties": false,
         "properties": {
-          "status": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "object": {
+            "type": "string",
+            "const": "challenge"
+          },
+          "sign_in_id": {
+            "description": "Set when this challenge is bound to a `SignIn`. Mutually exclusive\nwith the other parent ids — exactly one of `sign_in_id`,\n`sign_up_id`, `email_address_id`, `organization_domain_id` is\nnon-null.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sign_up_id": {
+            "description": "Set when this challenge is bound to a `SignUp`. Mutually exclusive\nwith the other parent ids.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "email_address_id": {
+            "description": "Set when this challenge is bound to an `EmailAddress` — i.e. a\nsigned-in user verifying an additional email. Mutually exclusive\nwith the other parent ids.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "organization_domain_id": {
+            "description": "Set when this challenge is bound to an `OrganizationDomain` — i.e.\nan operator proving control of a domain. Mutually exclusive with\nthe other parent ids.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "step": {
             "type": "string",
             "enum": [
-              "unverified",
-              "verified",
-              "transferable",
-              "failed",
-              "expired"
+              "first",
+              "second",
+              "single"
             ],
-            "description": "- `unverified` — challenge created, no successful attempt yet.\n- `verified` — challenge succeeded; the parent identifier is now trusted.\n- `transferable` — succeeded against the wrong flow type — the SDK\n  should bounce to the opposite flow with `transfer: true`. v0.2\n  cases:\n    1. **Magic-link sign-in for an unknown identifier** — the user\n       clicked a sign-in `email_link` for an address with no\n       matching `User`. The SDK creates a fresh sign-up via\n       `POST /v1/client/sign_ups { transfer: true }` to convert\n       the verified link into account creation.\n    2. **Magic-link sign-up for an existing identifier** — the\n       user clicked a sign-up `email_link` for an address that\n       already has a `User`. The SDK creates a fresh sign-in via\n       `POST /v1/client/sign_ins { transfer: true }` to convert\n       the verified link into a session. (Future OAuth flows\n       reuse the same status; the `transfer: true` body field is\n       unchanged from v0.1.)\n- `failed` — too many wrong attempts; the challenge can no longer be retried.\n- `expired` — `expire_at` is in the past; the challenge must be re-issued.\n"
+            "description": "Server-assigned at issue time based on the parent's state.\n\n- `first` — first authentication factor on a `SignIn` (typical\n  password / email_code / oauth / magic-link).\n- `second` — second factor for MFA on a `SignIn` (TOTP,\n  backup_code, sms_code, …). v0.3+.\n- `single` — every other case: sign-up email/phone verification,\n  ticket-bound flows, magic-link sign-up, email-address\n  verification, and organization-domain verification. There's no\n  MFA layered on top.\n"
           },
           "strategy": {
             "type": "string",
-            "description": "How this verification is being completed. v0.1 issues `email_code`,\n`reset_password_email_code`, `ticket`, `password`, and `transfer`.\nv0.2 adds `email_link` (magic link) — see the cross-device polling\nnote on `SignIn` / `SignUp`. OAuth, phone, passkeys, and TOTP\nland in later milestones.\n",
+            "description": "How this challenge is being completed. v0.2 surface:\n\n- `password`, `email_code`, `email_link`,\n  `reset_password_email_code`, `ticket`, `transfer` — sign-in /\n  sign-up.\n- `email_code`, `email_link` — email-address verification on a\n  signed-in user.\n- `domain_dns_txt`, `email_code` — organization-domain\n  verification.\n\nFuture strategies (TOTP, backup_code, SMS, OAuth, passkey) plug\nin here without spec changes.\n",
             "examples": [
+              "password",
               "email_code",
               "email_link",
               "reset_password_email_code",
-              "password",
               "ticket",
               "transfer",
+              "domain_dns_txt",
               "oauth_google",
               "phone_code",
               "passkey",
@@ -5316,19 +5517,30 @@
               "backup_code"
             ]
           },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "verified",
+              "transferable",
+              "failed",
+              "expired"
+            ]
+          },
           "attempts": {
             "type": "integer",
             "minimum": 0,
-            "description": "Number of confirm attempts made against this challenge."
+            "description": "Number of answers submitted against this challenge."
           },
           "expire_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "nonce": {
             "type": [
-              "integer",
+              "string",
               "null"
             ],
-            "format": "int64",
-            "minimum": 0,
-            "description": "Unix ms after which the challenge can no longer be confirmed. `null`\nfor strategies that don't expire (e.g. a `password` factor).\n"
+            "description": "Strategy-specific token surfaced to the client. Magic-link\nchallenges return the polling token clients use to drive\n`GET /challenges/{id}`. `domain_dns_txt` challenges return the\nTXT value the operator must publish under\n`_authn-challenge.<domain>`. Other strategies leave this null.\n"
           },
           "external_verification_redirect_url": {
             "type": [
@@ -5338,68 +5550,210 @@
             "format": "uri",
             "description": "For redirect-based strategies (OAuth, magic-link), the URL the\nbrowser should hand off to. `null` otherwise.\n"
           },
-          "nonce": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "Strategy-specific opaque blob. For OAuth this is the state nonce;\nfor passkey it's the authenticator challenge.\n"
-          },
           "error": {
             "description": "Last error returned by the strategy, if any.",
             "oneOf": [
               {
-                "$ref": "#/components/schemas/Error"
+                "type": "object",
+                "required": [
+                  "code",
+                  "message"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "code": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                }
               },
               {
                 "type": "null"
               }
             ]
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp"
           }
         },
         "examples": [
           {
-            "status": "unverified",
+            "id": "chal_01HKX9SY9V7H7TF8C8K7J9X4ZE",
+            "object": "challenge",
+            "sign_in_id": "sia_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+            "sign_up_id": null,
+            "email_address_id": null,
+            "organization_domain_id": null,
+            "step": "first",
             "strategy": "email_link",
+            "status": "pending",
             "attempts": 0,
             "expire_at": 1714724000000,
+            "nonce": "poll_01HKX9SY9V7H7TF8C8K7J9X4ZF",
             "external_verification_redirect_url": "https://acme.authn.sh/v1/client/handshake?__authn_ticket=tkt_01HKX9SY9V7H7TF8C8K7J9X4ZG&__authn_status=complete",
-            "nonce": null,
-            "error": null
+            "error": null,
+            "created_at": 1714723000000,
+            "updated_at": 1714723000000
           },
           {
+            "id": "chal_01HKX9SY9V7H7TF8C8K7J9X4ZE",
+            "object": "challenge",
+            "sign_in_id": "sia_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+            "sign_up_id": null,
+            "email_address_id": null,
+            "organization_domain_id": null,
+            "step": "first",
+            "strategy": "email_link",
             "status": "verified",
-            "strategy": "email_link",
             "attempts": 1,
             "expire_at": 1714724000000,
-            "external_verification_redirect_url": null,
             "nonce": null,
-            "error": null
+            "external_verification_redirect_url": null,
+            "error": null,
+            "created_at": 1714723000000,
+            "updated_at": 1714723500000
           },
           {
-            "status": "transferable",
-            "strategy": "email_link",
-            "attempts": 1,
+            "id": "chal_01HKX9SY9V7H7TF8C8K7J9X4ZN",
+            "object": "challenge",
+            "sign_in_id": null,
+            "sign_up_id": null,
+            "email_address_id": "idn_01HKX9SY9V7H7TF8C8K7J9X4ZE",
+            "organization_domain_id": null,
+            "step": "single",
+            "strategy": "email_code",
+            "status": "pending",
+            "attempts": 0,
             "expire_at": 1714724000000,
-            "external_verification_redirect_url": null,
             "nonce": null,
-            "error": {
-              "code": "identifier_not_found",
-              "message": "No user matches this email address.",
-              "long_message": "No user matches this email address. Bounce to sign-up with `transfer: true`.",
-              "meta": {}
-            }
+            "external_verification_redirect_url": null,
+            "error": null,
+            "created_at": 1714723000000,
+            "updated_at": 1714723000000
+          },
+          {
+            "id": "chal_01HKX9SY9V7H7TF8C8K7J9X4ZP",
+            "object": "challenge",
+            "sign_in_id": null,
+            "sign_up_id": null,
+            "email_address_id": null,
+            "organization_domain_id": "orgdom_01HKX9SY9V7H7TF8C8K7J9X4ZM",
+            "step": "single",
+            "strategy": "domain_dns_txt",
+            "status": "pending",
+            "attempts": 0,
+            "expire_at": 1714983300000,
+            "nonce": "authn-domain-verification=01HKX9SY9V7H7TF8C8K7J9X4ZQ",
+            "external_verification_redirect_url": null,
+            "error": null,
+            "created_at": 1714896900000,
+            "updated_at": 1714896900000
           }
+        ]
+      },
+      "ChallengeCreateRequest": {
+        "type": "object",
+        "description": "Body for `POST /…/challenges` against any parent that owns\nchallenges (`SignIn`, `SignUp`, `EmailAddress`, `OrganizationDomain`).\nPicks a strategy and supplies any fields the strategy needs to\n*issue* the challenge (e.g. which identifier to send the code to,\nwhich redirect URL to bounce back to).\n\nThe answer to the challenge is submitted separately via\n`POST .../challenges/{cid}/answer` with `ChallengeAnswerRequest`.\nStrategies that have nothing to issue (e.g. `password`,\n`domain_dns_txt`) return a `pending` challenge straight away — for\n`domain_dns_txt` the proof token is surfaced in `nonce`; for\n`password` `nonce` stays `null` and the caller proceeds straight\nto `answer`.\n\nPer-parent legal strategies:\n\n- `SignIn` — `password`, `email_code`, `email_link`,\n  `reset_password_email_code`, `ticket`, `transfer`.\n- `SignUp` — `email_code`, `email_link`, `ticket`, `transfer`.\n- `EmailAddress` — `email_code`, `email_link`.\n- `OrganizationDomain` — `domain_dns_txt`, `email_code`.\n",
+        "required": [
+          "strategy"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "strategy": {
+            "type": "string",
+            "description": "v0.2 surface across all parents:\n`password`, `email_code`, `email_link`, `reset_password_email_code`,\n`ticket`, `transfer`, `domain_dns_txt`. Future strategies (TOTP,\nbackup_code, SMS, OAuth, passkey) plug in here without spec\nchanges.\n",
+            "examples": [
+              "password",
+              "email_code",
+              "email_link",
+              "reset_password_email_code",
+              "ticket",
+              "transfer",
+              "domain_dns_txt"
+            ]
+          },
+          "email_address_id": {
+            "type": "string",
+            "description": "For `email_code` / `email_link` first-factor sign-in, the address to\nchallenge. Must be one of `SignIn.supported_strategies`'s implied\nidentifiers. Ignored for sign-up (the address comes from the\nattempt itself) and for the `EmailAddress` parent (the address is\nthe parent itself).\n"
+          },
+          "phone_number_id": {
+            "type": "string",
+            "description": "Reserved for `phone_code` (v0.3+)."
+          },
+          "redirect_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "For `email_link`, the URL the magic link bounces back to after\n`clientHandshake` consumes the ticket. Must be on the redirect-URL\nallowlist. Also used by OAuth strategies (v0.4+).\n"
+          }
+        },
+        "examples": [
+          {
+            "strategy": "password"
+          },
+          {
+            "strategy": "email_code",
+            "email_address_id": "idn_01HKX9SY9V7H7TF8C8K7J9X4ZE"
+          },
+          {
+            "strategy": "email_link",
+            "email_address_id": "idn_01HKX9SY9V7H7TF8C8K7J9X4ZE",
+            "redirect_url": "https://app.acme.com/dashboard"
+          },
+          {
+            "strategy": "reset_password_email_code",
+            "email_address_id": "idn_01HKX9SY9V7H7TF8C8K7J9X4ZE"
+          },
+          {
+            "strategy": "email_code"
+          },
+          {
+            "strategy": "domain_dns_txt"
+          }
+        ]
+      },
+      "ChallengeAnswerRequest": {
+        "type": "object",
+        "description": "Body for `POST /…/challenges/{cid}/answer` against any parent that\nowns challenges (`SignIn`, `SignUp`, `EmailAddress`,\n`OrganizationDomain`). The challenge already knows its strategy;\nthe body carries the strategy-specific answer.\n\n- `password` — `{ password: \"…\" }`.\n- `email_code` / `reset_password_email_code` — `{ code: \"123456\" }`.\n- `ticket` — `{ ticket: \"…\" }`.\n- `email_link` — `{ }` (empty body). This commits the SDK to polling\n  `GET .../challenges/{cid}`; the verification happens out-of-band when\n  the user clicks the magic link. The response is the polled state,\n  not a synchronous success.\n- `domain_dns_txt` — `{ }` (empty body). Hints the server to attempt\n  the DNS lookup right now. The response reflects the immediate\n  result — `verified` if the TXT record was visible, `pending` if\n  the lookup was queued. The server keeps polling DNS in the\n  background regardless.\n- `signature` is reserved for v0.5 (passkey).\n\nOn a `reset_password_email_code` answer the parent SignIn transitions\nto `needs_new_password`; the caller then creates a fresh `password`\nchallenge and answers it with the new password, which advances the\nsign-in to `complete`.\n",
+        "additionalProperties": false,
+        "properties": {
+          "password": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "ticket": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string",
+            "description": "Reserved for v0.5 (passkey)."
+          }
+        },
+        "examples": [
+          {
+            "password": "correct horse battery staple"
+          },
+          {
+            "code": "542178"
+          },
+          {}
         ]
       },
       "EmailAddress": {
         "type": "object",
-        "description": "An email identifier owned by a `User`. A user may have many email\naddresses; exactly one is the primary (referenced by\n`User.primary_email_address_id`). A new address starts unverified\nand becomes a usable sign-in identifier once `verification.status`\nreaches `verified`.\n",
+        "description": "An email identifier owned by a `User`. A user may have many email\naddresses; exactly one is the primary (referenced by\n`User.primary_email_address_id`). A new address starts unverified\nand becomes a usable sign-in identifier once `verified` flips to\n`true` — typically by issuing and answering a `Challenge` against\n`/v1/me/email-addresses/{id}/challenges`.\n",
         "required": [
           "id",
           "object",
           "email_address",
-          "verification",
+          "verified",
+          "current_challenge_id",
           "linked_to",
           "created_at",
           "updated_at"
@@ -5419,11 +5773,15 @@
             "maxLength": 254,
             "description": "The address itself, lower-cased and trimmed by the server."
           },
-          "verification": {
-            "description": "Current verification challenge for this address, or `null` if the\naddress was created server-side already verified (e.g. via BAPI\nwith `verified: true`).\n",
+          "verified": {
+            "type": "boolean",
+            "description": "`true` once a verification challenge against this address has\nreached `status: verified` (or the address was minted verified\nvia BAPI with `verified: true`).\n"
+          },
+          "current_challenge_id": {
+            "description": "Pointer to the live `Challenge` if one's in flight against this\naddress. `null` when no challenge has been issued yet, the\nprevious one was answered to a terminal status, or the address\nwas created already verified.\n",
             "oneOf": [
               {
-                "$ref": "#/components/schemas/Verification"
+                "$ref": "#/components/schemas/Id"
               },
               {
                 "type": "null"
@@ -5712,7 +6070,7 @@
           },
           "email_address": {
             "type": "array",
-            "description": "Initial email addresses for the user. Each is created with\n`verification.status = \"verified\"` (BAPI is privileged).\n",
+            "description": "Initial email addresses for the user. Each is created already\nverified (BAPI is privileged).\n",
             "items": {
               "type": "string",
               "format": "email",
@@ -5893,7 +6251,7 @@
           "verified": {
             "type": "boolean",
             "default": false,
-            "description": "When `true`, the address is created with\n`verification.status = \"verified\"` and no challenge is issued.\n"
+            "description": "When `true`, the address is created already verified and no\nchallenge is issued.\n"
           },
           "primary": {
             "type": "boolean",
@@ -7117,16 +7475,8 @@
               "organization_id": "org_01HKX9SY9V7H7TF8C8K7J9X4ZH",
               "name": "acme.com",
               "verified": false,
+              "current_challenge_id": null,
               "enrollment_mode": "automatic_invitation",
-              "verification": {
-                "status": "unverified",
-                "strategy": "email_code",
-                "attempts": 0,
-                "expire_at": 1714983300000,
-                "external_verification_redirect_url": null,
-                "nonce": null,
-                "error": null
-              },
               "affiliation_email_address": "admin@acme.com",
               "total_pending_invitations": 0,
               "total_pending_suggestions": 0,
@@ -7947,13 +8297,14 @@
       },
       "OrganizationDomain": {
         "type": "object",
-        "description": "A domain attached to an `Organization`. Once verified, drives\ndomain-based enrollment — depending on `enrollment_mode`, sign-ups\nwith a matching email get an automatic invitation, an automatic\nmembership-request suggestion, or nothing at all.\n\nVerification reuses the existing `Verification` shape; the proof\nchannel (DNS TXT or email-to-`affiliation_email_address`) is\nrecorded in `verification.strategy` (`dns` or `email_code`).\n",
+        "description": "A domain attached to an `Organization`. Once verified, drives\ndomain-based enrollment — depending on `enrollment_mode`, sign-ups\nwith a matching email get an automatic invitation, an automatic\nmembership-request suggestion, or nothing at all.\n\nVerification runs through a `Challenge` against\n`/v1/organizations/{org}/domains/{id}/challenges`. The proof channel\n(DNS TXT or email-to-`affiliation_email_address`) is selected by the\nchallenge's `strategy` (`domain_dns_txt` or `email_code`).\n",
         "required": [
           "id",
           "object",
           "organization_id",
           "name",
           "verified",
+          "current_challenge_id",
           "enrollment_mode",
           "total_pending_invitations",
           "total_pending_suggestions",
@@ -7980,7 +8331,18 @@
           },
           "verified": {
             "type": "boolean",
-            "description": "`true` once `verification.status === 'verified'`. The two\nflags are kept in sync but `verified` is denormalized for\ncheap list filtering.\n"
+            "description": "`true` once a verification challenge against this domain has\nreached `status: verified`.\n"
+          },
+          "current_challenge_id": {
+            "description": "Pointer to the live `Challenge` if one's in flight against this\ndomain. `null` when no challenge has been issued yet, the\nprevious one was answered to a terminal status, or the operator\nhas rotated the proof token.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "enrollment_mode": {
             "type": "string",
@@ -7991,24 +8353,13 @@
             ],
             "description": "- `manual_invitation` — domain match has no effect on sign-up;\n  members must be invited explicitly.\n- `automatic_invitation` — sign-ups with a matching email\n  skip the invitation step and join as `default_role`.\n- `automatic_suggestion` — sign-ups with a matching email get\n  an `OrganizationMembershipRequest` row that an admin must\n  approve.\n"
           },
-          "verification": {
-            "description": "Latest verification challenge. `null` when verification is\nnot in flight (e.g. an admin has just rotated the token).\n",
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/Verification"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "affiliation_email_address": {
             "type": [
               "string",
               "null"
             ],
             "format": "email",
-            "description": "Address used as the `email_code` verification target when\n`verification.strategy === 'email_code'`. Always sits at the\ndomain being verified (e.g. `admin@acme.com`).\n"
+            "description": "Address used as the `email_code` verification target when the\ndomain is being verified via the `email_code` challenge\nstrategy. Always sits at the domain being verified\n(e.g. `admin@acme.com`).\n"
           },
           "total_pending_invitations": {
             "type": "integer",
@@ -8050,19 +8401,10 @@
             ],
             "default": "manual_invitation"
           },
-          "verification_strategy": {
-            "type": "string",
-            "enum": [
-              "dns",
-              "email_code"
-            ],
-            "default": "dns",
-            "description": "Which proof channel to use. `dns` writes a TXT record check\nto `verification`; `email_code` sends a code to\n`affiliation_email_address`.\n"
-          },
           "affiliation_email_address": {
             "type": "string",
             "format": "email",
-            "description": "Required when `verification_strategy === 'email_code'`. Must\nsit at the domain being verified.\n"
+            "description": "Optional address to use as the `email_code` verification target\nwhen an operator later issues an `email_code` challenge against\nthis domain. Must sit at the domain being verified.\n"
           }
         }
       },

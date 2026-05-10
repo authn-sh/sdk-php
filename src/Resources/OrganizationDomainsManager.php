@@ -72,15 +72,4 @@ final class OrganizationDomainsManager extends Manager
             '/v1/organizations/' . rawurlencode($this->orgId) . '/domains/' . rawurlencode($domainId),
         );
     }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function verify(string $domainId): array
-    {
-        return $this->transport->send(
-            'POST',
-            '/v1/organizations/' . rawurlencode($this->orgId) . '/domains/' . rawurlencode($domainId) . '/verify',
-        );
-    }
 }

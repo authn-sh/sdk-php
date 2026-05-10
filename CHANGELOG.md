@@ -13,10 +13,14 @@
 - `OrganizationsManager` — `list`, `create`, `get`, `update`, `delete`, `members`, `invitations`, `domains`.
 - `OrganizationMembershipsManager` — `list`, `create`, `update`, `delete`. Accessible via `$client->organizations()->members($orgId)`.
 - `OrganizationInvitationsManager` — `list`, `create`, `bulkCreate`, `revoke`. Accessible via `$client->organizations()->invitations($orgId)`.
-- `OrganizationDomainsManager` — `list`, `create`, `get`, `update`, `delete`, `verify`. Accessible via `$client->organizations()->domains($orgId)`.
+- `OrganizationDomainsManager` — `list`, `create`, `get`, `update`, `delete`. Accessible via `$client->organizations()->domains($orgId)`.
 - `Client::organizations()` accessor.
 - `UsersManager::listOrganizationMemberships` and `listOrganizationInvitations` now hit the real BAPI endpoints.
 - OpenAPI fixture refreshed to v0.2 bundle (route slugs normalised to kebab-case, `WebhookEndpoint` gains `rotation_window_expires_at` / `disabled_at`, `Session` gains optional embedded `user` snapshot).
+
+### Removed
+
+- `OrganizationDomainsManager::verify()` — the `/verify` endpoint is superseded by the challenges flow (`/domains/{id}/challenges`).
 
 ### Fixed
 

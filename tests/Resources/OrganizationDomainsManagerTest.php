@@ -63,15 +63,3 @@ it('gets, updates, deletes a domain', function (): void {
     expect((string) $mock->requestAt(1)->getUri())->toEndWith('/v1/organizations/org_1/domains/domain_1');
     expect((string) $mock->requestAt(2)->getUri())->toEndWith('/v1/organizations/org_1/domains/domain_1');
 });
-
-it('verifies a domain via POST to /verify', function (): void {
-    $mock = (new MockTransport)->enqueue(body: ['id' => 'domain_1', 'verification' => ['status' => 'verified']]);
-    $manager = new OrganizationDomainsManager($mock->transport(), 'org_1');
-
-    $result = $manager->verify('domain_1');
-
-    expect($result['id'])->toBe('domain_1');
-    expect($mock->lastRequest()->getMethod())->toBe('POST');
-    expect((string) $mock->lastRequest()->getUri())
-        ->toEndWith('/v1/organizations/org_1/domains/domain_1/verify');
-});
