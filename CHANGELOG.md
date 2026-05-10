@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0] — 2026-05-10
+
+### Added
+
+- `UsersManager::verifyTotp(string $userId, string $code): TotpVerificationResult` — BAPI operator-driven TOTP check (does not stamp `TotpSecret.verified_at`).
+- `UsersManager::disableMfa(string $userId): User` — BAPI operator nuke; clears `TotpSecret` + all `BackupCode` rows server-side and rehydrates the `User` shape.
+- `VerifiedClaims->twoFactorVerified: bool`, `firstFactorAgeSeconds: ?int`, `secondFactorAgeSeconds: ?int` parsed from the `fva` JWT claim. `null` / `false` defaults when the claim is absent — no behavioural change for v0.2 callers.
+
 ## [0.2.0] — 2026-05-10
 
 ### Added
