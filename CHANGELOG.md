@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- `OauthProvidersManager` — BAPI binding for `/v1/oauth-providers` (`list`, `create`, `get`, `update`, `delete`, `test`) plus `OauthProvider`, `OauthProviderTestResult`, `OauthProviderTestError` DTOs and the `OauthProvidersListParams`. Accessible via `$client->oauthProviders()`.
+- `SmsTemplatesManager` — BAPI binding for `/v1/sms-templates` (`list`, `get`, `update(slug, payload)`, `revert(slug)`) plus the `SmsTemplate` DTO with `SLUG_*` constants. Accessible via `$client->smsTemplates()`.
+- `Json::decodeAny()` and `Transport::sendAny()` for endpoints that return a top-level JSON array (`GET /v1/sms-templates`).
+- `VerifiedClaims->phoneNumberVerified: bool` parsed from the `pnv` JWT claim. `false` when the claim is absent.
+- `VerifiedClaims->defaultSecondFactor: ?string` parsed from the `dsf` JWT claim. One of `totp` / `phone_code` / `backup_code`; `null` for absent or unrecognized values.
+- `VerifiedClaims::SECOND_FACTOR_TOTP` / `SECOND_FACTOR_PHONE_CODE` / `SECOND_FACTOR_BACKUP_CODE` constants.
+- `VerifiedClaims::hasVerifiedPhoneNumber()` and `::preferredSecondFactor()` helper methods.
+
 ## [0.3.0] — 2026-05-10
 
 ### Added

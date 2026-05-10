@@ -6,6 +6,12 @@ namespace Authn\Sdk\Tokens;
 
 final class VerifiedClaims
 {
+    public const SECOND_FACTOR_TOTP = 'totp';
+
+    public const SECOND_FACTOR_PHONE_CODE = 'phone_code';
+
+    public const SECOND_FACTOR_BACKUP_CODE = 'backup_code';
+
     /**
      * @param  array{iss: string, sub: string, sid: string}|null  $actor  impersonation chain
      * @param  array{id: string, slg?: string, rol?: string, per?: array<int, string>}|null  $org  deprecated: use $organization
@@ -27,6 +33,8 @@ final class VerifiedClaims
         public readonly bool $twoFactorVerified = false,
         public readonly ?int $secondFactorAgeSeconds = null,
         public readonly ?int $firstFactorAgeSeconds = null,
+        public readonly bool $phoneNumberVerified = false,
+        public readonly ?string $defaultSecondFactor = null,
     ) {}
 
     public function hasRole(string $key): bool
@@ -37,5 +45,15 @@ final class VerifiedClaims
     public function hasPermission(string $key): bool
     {
         return $this->organization !== null && $this->organization->hasPermission($key);
+    }
+
+    public function hasVerifiedPhoneNumber(): bool
+    {
+        return $this->phoneNumberVerified;
+    }
+
+    public function preferredSecondFactor(): ?string
+    {
+        return $this->defaultSecondFactor;
     }
 }

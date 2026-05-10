@@ -262,6 +262,9 @@ final class TokenVerifier
 
         [$firstFactorAgeSeconds, $secondFactorAgeSeconds, $twoFactorVerified] = $this->parseFva($claims);
 
+        $phoneNumberVerified = isset($claims['pnv']) && $claims['pnv'] === true;
+        $defaultSecondFactor = $this->parseDefaultSecondFactor($claims);
+
         return new VerifiedClaims(
             sub: $sub,
             sid: $sid,
@@ -278,7 +281,27 @@ final class TokenVerifier
             twoFactorVerified: $twoFactorVerified,
             secondFactorAgeSeconds: $secondFactorAgeSeconds,
             firstFactorAgeSeconds: $firstFactorAgeSeconds,
+            phoneNumberVerified: $phoneNumberVerified,
+            defaultSecondFactor: $defaultSecondFactor,
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $claims
+     */
+    private function parseDefaultSecondFactor(array $claims): ?string
+    {
+        if (! isset($claims['dsf']) || ! is_string($claims['dsf'])) {
+            return null;
+        }
+
+        $valid = [
+            VerifiedClaims::SECOND_FACTOR_TOTP,
+            VerifiedClaims::SECOND_FACTOR_PHONE_CODE,
+            VerifiedClaims::SECOND_FACTOR_BACKUP_CODE,
+        ];
+
+        return in_array($claims['dsf'], $valid, true) ? $claims['dsf'] : null;
     }
 
     /**

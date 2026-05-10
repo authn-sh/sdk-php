@@ -294,3 +294,73 @@ it('maps first-factor-age of -1 to null firstFactorAgeSeconds', function (): voi
     expect($verified->firstFactorAgeSeconds)->toBeNull();
     expect($verified->secondFactorAgeSeconds)->toBeNull();
 });
+
+it('surfaces phoneNumberVerified when pnv claim is true', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $claims = validClaims();
+    $claims['pnv'] = true;
+
+    $verified = $verifier->verify($fixture->sign($claims));
+
+    expect($verified->phoneNumberVerified)->toBeTrue();
+    expect($verified->hasVerifiedPhoneNumber())->toBeTrue();
+});
+
+it('defaults phoneNumberVerified to false when pnv claim is absent', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $verified = $verifier->verify($fixture->sign(validClaims()));
+
+    expect($verified->phoneNumberVerified)->toBeFalse();
+    expect($verified->hasVerifiedPhoneNumber())->toBeFalse();
+});
+
+it('treats pnv: false as phoneNumberVerified=false', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $claims = validClaims();
+    $claims['pnv'] = false;
+
+    $verified = $verifier->verify($fixture->sign($claims));
+
+    expect($verified->phoneNumberVerified)->toBeFalse();
+});
+
+it('parses dsf as defaultSecondFactor for each supported factor', function (string $factor): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $claims = validClaims();
+    $claims['dsf'] = $factor;
+
+    $verified = $verifier->verify($fixture->sign($claims));
+
+    expect($verified->defaultSecondFactor)->toBe($factor);
+    expect($verified->preferredSecondFactor())->toBe($factor);
+})->with(['totp', 'phone_code', 'backup_code']);
+
+it('defaults defaultSecondFactor to null when dsf claim is absent', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $verified = $verifier->verify($fixture->sign(validClaims()));
+
+    expect($verified->defaultSecondFactor)->toBeNull();
+    expect($verified->preferredSecondFactor())->toBeNull();
+});
+
+it('rejects unknown dsf values as null defaultSecondFactor', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $claims = validClaims();
+    $claims['dsf'] = 'webauthn';
+
+    $verified = $verifier->verify($fixture->sign($claims));
+
+    expect($verified->defaultSecondFactor)->toBeNull();
+});
