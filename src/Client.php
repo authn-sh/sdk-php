@@ -9,6 +9,7 @@ use Authn\Sdk\Resources\AllowlistIdentifiersManager;
 use Authn\Sdk\Resources\BlocklistIdentifiersManager;
 use Authn\Sdk\Resources\InstanceManager;
 use Authn\Sdk\Resources\InvitationsManager;
+use Authn\Sdk\Resources\OauthProvidersManager;
 use Authn\Sdk\Resources\OrganizationsManager;
 use Authn\Sdk\Resources\PermissionsManager;
 use Authn\Sdk\Resources\RedirectUrlsManager;
@@ -104,5 +105,10 @@ final class Client
     public function permissions(): PermissionsManager
     {
         return new PermissionsManager($this->transport);
+    }
+
+    public function oauthProviders(): OauthProvidersManager
+    {
+        return new OauthProvidersManager($this->transport);
     }
 }

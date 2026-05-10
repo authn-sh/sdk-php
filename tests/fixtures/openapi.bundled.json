@@ -84,6 +84,14 @@
       "description": "Per-environment settings (`InstanceSetting`)."
     },
     {
+      "name": "OAuth Providers",
+      "description": "Per-environment social-IdP configuration (`OauthProvider`)."
+    },
+    {
+      "name": "SMS Templates",
+      "description": "Per-environment outbound SMS body customization (`SmsTemplate`)."
+    },
+    {
       "name": "Webhooks",
       "description": "Webhook endpoints, deliveries, and the event envelope."
     }
@@ -4827,6 +4835,539 @@
         }
       }
     },
+    "/v1/oauth-providers": {
+      "get": {
+        "operationId": "listOauthProviders",
+        "summary": "List OAuth providers",
+        "description": "Paginated list of every `OauthProvider` row configured on the\nenvironment, regardless of `enabled` state. The dashboard renders\nthe rows in this order; reorder by re-creating with a different\n`created_at` (no separate `position` column).\n",
+        "tags": [
+          "OAuth Providers"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LimitParam"
+          },
+          {
+            "$ref": "#/components/parameters/OffsetParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of OAuth providers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/PaginatedList"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/OauthProvider"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createOauthProvider",
+        "summary": "Create an OAuth provider",
+        "description": "Register a social-IdP connection on this environment. Three kinds:\n\n- `preset` — bundled IdP. Operator only supplies `provider_key`\n  (one of `google`, `github`, `apple`, `microsoft`), `client_id`,\n  and `client_secret`; the platform fills in OIDC discovery,\n  default scopes, and the standard `attribute_mapping`.\n- `custom_oidc` — workspace IdP. Operator supplies `provider_key`,\n  `client_id`, `client_secret`, and `issuer`; the server fetches\n  `<issuer>/.well-known/openid-configuration` and populates the\n  endpoint fields automatically.\n- `custom_oauth2` — plain OAuth 2.0 IdP. Operator supplies\n  `provider_key`, `client_id`, `client_secret`,\n  `authorization_endpoint`, `token_endpoint`, `userinfo_endpoint`,\n  `userinfo_method`, and `userinfo_auth`.\n\n`client_secret` is encrypted at rest and never returned by any GET.\nThe computed `redirect_uri` (the URL the IdP must redirect to) is\nsurfaced in the response — register that exact value with the IdP.\n",
+        "tags": [
+          "OAuth Providers"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OauthProviderRequest"
+              },
+              "examples": {
+                "preset_google": {
+                  "summary": "Google preset (minimal POST body)",
+                  "value": {
+                    "provider_kind": "preset",
+                    "provider_key": "google",
+                    "name": "Google",
+                    "client_id": "123456789012-abc.apps.googleusercontent.com",
+                    "client_secret": "GOCSPX-xxxxxxxxxxxxxxxxxxxxxxxxx",
+                    "additional_authorization_params": {
+                      "prompt": "select_account"
+                    }
+                  }
+                },
+                "custom_oidc_acme": {
+                  "summary": "Workspace OIDC IdP",
+                  "value": {
+                    "provider_kind": "custom_oidc",
+                    "provider_key": "acme_corp_sso",
+                    "name": "Acme Corp SSO",
+                    "client_id": "acme-authn-prod",
+                    "client_secret": "shhhh",
+                    "issuer": "https://sso.acme.example",
+                    "scopes": [
+                      "openid",
+                      "email",
+                      "profile",
+                      "groups"
+                    ],
+                    "allow_sign_up": false,
+                    "block_email_subaddresses": true
+                  }
+                },
+                "custom_oauth2_legacy": {
+                  "summary": "Plain OAuth 2.0 IdP (no OIDC discovery)",
+                  "value": {
+                    "provider_kind": "custom_oauth2",
+                    "provider_key": "legacy_idp",
+                    "name": "Legacy IdP",
+                    "client_id": "legacy-client",
+                    "client_secret": "legacy-secret",
+                    "authorization_endpoint": "https://idp.legacy.example/oauth/authorize",
+                    "token_endpoint": "https://idp.legacy.example/oauth/token",
+                    "userinfo_endpoint": "https://idp.legacy.example/api/me",
+                    "userinfo_method": "GET",
+                    "userinfo_auth": "bearer",
+                    "scopes": [
+                      "read_profile",
+                      "read_email"
+                    ],
+                    "attribute_mapping": {
+                      "email_address": "email",
+                      "provider_user_id": "id"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The created OAuth provider.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OauthProvider"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          }
+        }
+      }
+    },
+    "/v1/oauth-providers/{oauth_provider_id}": {
+      "parameters": [
+        {
+          "name": "oauth_provider_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getOauthProvider",
+        "summary": "Get an OAuth provider",
+        "description": "Fetch a single `OauthProvider` row. `client_secret` is never included.",
+        "tags": [
+          "OAuth Providers"
+        ],
+        "responses": {
+          "200": {
+            "description": "The OAuth provider.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OauthProvider"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateOauthProvider",
+        "summary": "Update an OAuth provider",
+        "description": "Partial update. `provider_kind` and `provider_key` are immutable —\nsending a different value returns `422`. Every other field is\noptional; omitted keys are left untouched. Sending\n`client_secret: null` clears the stored secret (e.g. when migrating\nto a PKCE-only flow).\n\nPatching `enabled` to `false` keeps existing `ExternalAccount`\nrows but prevents new sign-ins via this provider. Patching\n`allow_sign_in: false` and `allow_sign_up: false` together has the\nsame effect as `enabled: false`.\n",
+        "tags": [
+          "OAuth Providers"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OauthProviderRequest"
+              },
+              "examples": {
+                "disable": {
+                  "summary": "Pause without deleting",
+                  "value": {
+                    "enabled": false
+                  }
+                },
+                "rotate_secret": {
+                  "summary": "Rotate the IdP client secret",
+                  "value": {
+                    "client_secret": "GOCSPX-yyyyyyyyyyyyyyyyyyyyyyyyy"
+                  }
+                },
+                "tighten_signups": {
+                  "summary": "Sign-in only — refuse new accounts via this provider",
+                  "value": {
+                    "allow_sign_up": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated OAuth provider.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OauthProvider"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteOauthProvider",
+        "summary": "Delete an OAuth provider",
+        "description": "Soft delete. Refuses (`409 oauth_provider_in_use`) when any\n`ExternalAccount` rows still link to this provider — operators\nmust migrate or unlink those users first to keep the audit trail\nof past sign-ins intact. Once deleted, the\n`oauth_<provider_key>` strategy on `Challenge` is rejected for\nthis environment.\n",
+        "tags": [
+          "OAuth Providers"
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/oauth-providers/{oauth_provider_id}/test": {
+      "parameters": [
+        {
+          "name": "oauth_provider_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "testOauthProvider",
+        "summary": "Dry-run an OAuth provider",
+        "description": "Probe the provider's configuration without redirecting any user.\nThe dashboard runs this on save to surface broken endpoints up\nfront, instead of letting an operator find out at sign-in time.\n\nThe server:\n\n- Builds the `/authorize` URL the SDK would redirect to (using a\n  synthetic `state` and `redirect_uri = OauthProvider.redirect_uri`)\n  and returns it on `authorize_url`.\n- Optionally HEAD-probes `userinfo_endpoint` (without an access\n  token, expecting `401`/`403`) to confirm the URL is reachable\n  and surfaces any DNS / TLS / 5xx issues. The HTTP status code\n  is returned on `userinfo_status`; `null` when the provider has\n  no `userinfo_endpoint` configured (some OIDC IdPs ship every\n  claim in the ID token).\n- Collects any errors (validation, OIDC discovery refresh, network\n  timeouts) into `errors[]`.\n\nAlways returns `200` — even when probes fail. The caller inspects\n`errors[]` to decide whether to surface a red dot in the UI.\n",
+        "tags": [
+          "OAuth Providers"
+        ],
+        "responses": {
+          "200": {
+            "description": "Probe result. Inspect `errors[]` to decide pass/fail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OauthProviderTestResult"
+                },
+                "examples": {
+                  "healthy": {
+                    "summary": "All probes passed",
+                    "value": {
+                      "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=123-abc.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Facme.authn.sh%2Fv1%2Foauth-callback%2Fgoogle&scope=openid+email+profile&state=test_01HKX9SY9V7H7TF8C8K7J9X4ZA&prompt=select_account",
+                      "userinfo_status": 401,
+                      "errors": []
+                    }
+                  },
+                  "misconfigured_userinfo": {
+                    "summary": "Userinfo endpoint returns 5xx",
+                    "value": {
+                      "authorize_url": "https://idp.legacy.example/oauth/authorize?response_type=code&client_id=legacy-client&redirect_uri=https%3A%2F%2Facme.authn.sh%2Fv1%2Foauth-callback%2Flegacy_idp&scope=read_profile+read_email&state=test_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+                      "userinfo_status": 502,
+                      "errors": [
+                        {
+                          "code": "oauth_userinfo_unreachable",
+                          "message": "userinfo_endpoint returned 502 Bad Gateway",
+                          "long_message": "The IdP's userinfo endpoint returned a 502. Check the IdP's status page or your firewall rules and re-test."
+                        }
+                      ]
+                    }
+                  },
+                  "stale_discovery": {
+                    "summary": "OIDC discovery cache expired and refresh failed",
+                    "value": {
+                      "authorize_url": "",
+                      "userinfo_status": null,
+                      "errors": [
+                        {
+                          "code": "oauth_discovery_refresh_failed",
+                          "message": "Could not refresh /.well-known/openid-configuration",
+                          "long_message": "The cached OIDC discovery document is older than 24h and a refresh attempt timed out. Verify the issuer URL and that the discovery endpoint is reachable from authn.sh."
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/sms-templates": {
+      "get": {
+        "operationId": "listSmsTemplates",
+        "summary": "List SMS templates",
+        "description": "All `SmsTemplate` rows for the current environment. Each\nenvironment is seeded with one row per slug\n(`verification_code`, `reset_password_code`, `invitation`) on\ncreation — list always returns exactly those rows, in slug order.\n",
+        "tags": [
+          "SMS Templates"
+        ],
+        "responses": {
+          "200": {
+            "description": "The environment's SMS templates.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SmsTemplate"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/sms-templates/{sms_template_slug}": {
+      "parameters": [
+        {
+          "name": "sms_template_slug",
+          "in": "path",
+          "required": true,
+          "description": "The template slug. One of `verification_code`,\n`reset_password_code`, `invitation`. Convention copied from\n`/v1/email-templates/{email_template_slug}` (when that ships).\n",
+          "schema": {
+            "type": "string",
+            "enum": [
+              "verification_code",
+              "reset_password_code",
+              "invitation"
+            ]
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getSmsTemplate",
+        "summary": "Get an SMS template",
+        "description": "Fetch a single SMS template by slug.",
+        "tags": [
+          "SMS Templates"
+        ],
+        "responses": {
+          "200": {
+            "description": "The SMS template.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsTemplate"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateSmsTemplate",
+        "summary": "Update an SMS template",
+        "description": "Patch any of `body`, `delivered_by_us`, or `from_number_override`.\nOmitted keys are left untouched. The slug is immutable — to \"switch\ntemplate\", use `PATCH` to overwrite the body in place. To restore\nthe seeded default, use `revertSmsTemplate`.\n",
+        "tags": [
+          "SMS Templates"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SmsTemplateRequest"
+              },
+              "examples": {
+                "edit_body": {
+                  "summary": "Customize the verification-code copy",
+                  "value": {
+                    "body": "Your {{app.name}} login code is {{otp_code}}. Valid for {{ttl_minutes}} minutes."
+                  }
+                },
+                "handoff": {
+                  "summary": "Stop authn.sh from sending; operator's webhook will handle it",
+                  "value": {
+                    "delivered_by_us": false
+                  }
+                },
+                "set_from_number": {
+                  "summary": "Send from a branded short code",
+                  "value": {
+                    "from_number_override": "+15555550100"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated SMS template.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsTemplate"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          }
+        }
+      }
+    },
+    "/v1/sms-templates/{sms_template_slug}/revert": {
+      "parameters": [
+        {
+          "name": "sms_template_slug",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "enum": [
+              "verification_code",
+              "reset_password_code",
+              "invitation"
+            ]
+          }
+        }
+      ],
+      "post": {
+        "operationId": "revertSmsTemplate",
+        "summary": "Revert an SMS template to default",
+        "description": "Reset `body`, `delivered_by_us`, and `from_number_override` to\nthe platform-shipped defaults for this slug. Useful when an\noperator wants to undo customization without retyping the\noriginal copy.\n",
+        "tags": [
+          "SMS Templates"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The reverted SMS template.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SmsTemplate"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/webhooks/endpoints": {
       "get": {
         "operationId": "listWebhookEndpoints",
@@ -5642,7 +6183,7 @@
           },
           "strategy": {
             "type": "string",
-            "description": "How this challenge is being completed. v0.3 surface:\n\n- `password`, `email_code`, `email_link`,\n  `reset_password_email_code`, `ticket`, `transfer` — sign-in /\n  sign-up first factor.\n- `totp`, `backup_code` — sign-in second factor (`step: \"second\"`\n  only). Answer with `{ code: \"123456\" }` for `totp` (numeric,\n  6 digits, `±1 step` tolerance) or `{ code: \"abcd-efgh\" }` for\n  `backup_code` (single-use, hashed at rest).\n- `email_code`, `email_link` — email-address verification on a\n  signed-in user.\n- `domain_dns_txt`, `email_code` — organization-domain\n  verification.\n\nFuture strategies (SMS, OAuth, passkey) plug in here without\nspec changes.\n",
+            "description": "How this challenge is being completed.\n\n- `password`, `email_code`, `email_link`,\n  `reset_password_email_code`, `ticket`, `transfer` — sign-in /\n  sign-up first factor.\n- `oauth_<provider_key>` — first-factor social sign-in / sign-up.\n  `<provider_key>` matches a row in the environment's\n  `OauthProvider` registry (`google`, `github`, `apple`,\n  `microsoft`, or any workspace-registered `custom_oidc` /\n  `custom_oauth2` slug). The challenge surfaces the IdP's\n  authorize URL on `external_verification_redirect_url`; the SDK\n  redirects the browser there and resumes via\n  `/v1/oauth-callback/<provider_key>`.\n- `phone_code` — SMS code, served two ways:\n    - **First factor on sign-up** (`step: \"single\"`) when the\n      env's `attributes.phone_number != \"off\"` and the user\n      supplied a phone in the `SignUp` attempt.\n    - **Second factor on sign-in** (`step: \"second\"`) when the\n      user has at least one `PhoneNumber` row with\n      `reserved_for_second_factor: true` and the env has\n      `multi_factor.phone_code.enabled: true`.\n    - **Phone-number verification on a signed-in user**\n      (`step: \"single\"`) issued against a parent\n      `phone_number_id`, mirroring `email_code` against an\n      `EmailAddress`.\n  Answer with `{ code: \"123456\" }` (numeric, 6 digits).\n- `totp`, `backup_code` — sign-in second factor (`step: \"second\"`\n  only). Answer with `{ code: \"123456\" }` for `totp` (numeric,\n  6 digits, `±1 step` tolerance) or `{ code: \"abcd-efgh\" }` for\n  `backup_code` (single-use, hashed at rest).\n- `email_code`, `email_link` — email-address verification on a\n  signed-in user.\n- `domain_dns_txt`, `email_code` — organization-domain\n  verification.\n\nFuture strategies (passkey) plug in here without spec changes.\n",
             "examples": [
               "password",
               "email_code",
@@ -5835,7 +6376,7 @@
       },
       "ChallengeCreateRequest": {
         "type": "object",
-        "description": "Body for `POST /…/challenges` against any parent that owns\nchallenges (`SignIn`, `SignUp`, `EmailAddress`, `OrganizationDomain`).\nPicks a strategy and supplies any fields the strategy needs to\n*issue* the challenge (e.g. which identifier to send the code to,\nwhich redirect URL to bounce back to).\n\nThe answer to the challenge is submitted separately via\n`POST .../challenges/{cid}/answer` with `ChallengeAnswerRequest`.\nStrategies that have nothing to issue (e.g. `password`,\n`domain_dns_txt`, `totp`, `backup_code`) return a `pending` challenge\nstraight away — for `domain_dns_txt` the proof token is surfaced in\n`nonce`; for `password`, `totp`, and `backup_code` `nonce` stays\n`null` and the caller proceeds straight to `answer`.\n\nPer-parent legal strategies:\n\n- `SignIn` (first factor) — `password`, `email_code`, `email_link`,\n  `reset_password_email_code`, `ticket`, `transfer`.\n- `SignIn` (second factor) — `totp`, `backup_code`. Only legal when\n  the parent SignIn is in `needs_second_factor`; the server narrows\n  `SignIn.supported_strategies` to the second-factor methods the\n  resolved user has enrolled. `step` on the resulting Challenge is\n  set to `\"second\"`.\n- `SignUp` — `email_code`, `email_link`, `ticket`, `transfer`.\n  Sign-up never gains a second factor.\n- `EmailAddress` — `email_code`, `email_link`.\n- `OrganizationDomain` — `domain_dns_txt`, `email_code`.\n",
+        "description": "Body for `POST /…/challenges` against any parent that owns\nchallenges (`SignIn`, `SignUp`, `EmailAddress`, `OrganizationDomain`).\nPicks a strategy and supplies any fields the strategy needs to\n*issue* the challenge (e.g. which identifier to send the code to,\nwhich redirect URL to bounce back to).\n\nThe answer to the challenge is submitted separately via\n`POST .../challenges/{cid}/answer` with `ChallengeAnswerRequest`.\nStrategies that have nothing to issue (e.g. `password`,\n`domain_dns_txt`, `totp`, `backup_code`) return a `pending` challenge\nstraight away — for `domain_dns_txt` the proof token is surfaced in\n`nonce`; for `password`, `totp`, and `backup_code` `nonce` stays\n`null` and the caller proceeds straight to `answer`.\n\nPer-parent legal strategies:\n\n- `SignIn` (first factor) — `password`, `email_code`, `email_link`,\n  `phone_code`, `oauth_<provider_key>`,\n  `reset_password_email_code`, `ticket`, `transfer`.\n  `oauth_<provider_key>` requires `redirect_url` and\n  `redirect_url_complete` — the server bakes them into the IdP\n  `state` and surfaces the IdP's authorize URL on\n  `external_verification_redirect_url`. `step` is server-assigned\n  `first`; OAuth never serves as second factor.\n- `SignIn` (second factor) — `totp`, `backup_code`, `phone_code`.\n  Only legal when the parent SignIn is in `needs_second_factor`; the\n  server narrows `SignIn.supported_strategies` to the second-factor\n  methods the resolved user has enrolled. `step` on the resulting\n  Challenge is set to `\"second\"`. `phone_code` here defaults to the\n  user's `default_second_factor` phone, falling back to\n  `User.primary_phone_number_id`; supply `phone_number_id`\n  explicitly to target a different reserved-for-MFA row.\n- `SignUp` — `email_code`, `email_link`, `phone_code`,\n  `oauth_<provider_key>`, `ticket`, `transfer`. Sign-up never gains\n  a second factor — the `phone_code` here is the first-factor\n  phone-attribute path; `oauth_<provider_key>` is the first-factor\n  social-sign-up path (subject to `OauthProvider.allow_sign_up`).\n- `EmailAddress` — `email_code`, `email_link`.\n- `PhoneNumber` — `phone_code`. Used by FAPI\n  `/v1/me/phone-numbers/{id}/challenges` to verify additional phone\n  numbers on an already-signed-in user.\n- `OrganizationDomain` — `domain_dns_txt`, `email_code`.\n",
         "required": [
           "strategy"
         ],
@@ -5843,11 +6384,14 @@
         "properties": {
           "strategy": {
             "type": "string",
-            "description": "v0.3 surface across all parents:\n`password`, `email_code`, `email_link`, `reset_password_email_code`,\n`ticket`, `transfer`, `domain_dns_txt`, `totp`, `backup_code`.\nFuture strategies (SMS, OAuth, passkey) plug in here without spec\nchanges.\n",
+            "description": "Strategy across all parents:\n`password`, `email_code`, `email_link`, `phone_code`,\n`oauth_<provider_key>`, `reset_password_email_code`, `ticket`,\n`transfer`, `domain_dns_txt`, `totp`, `backup_code`.\n`oauth_<provider_key>` resolves against the environment's\n`OauthProvider` registry — `<provider_key>` matches\n`^[a-z][a-z0-9_]*$`. Future strategies (passkey) plug in here\nwithout spec changes.\n",
             "examples": [
               "password",
               "email_code",
               "email_link",
+              "phone_code",
+              "oauth_google",
+              "oauth_acme_corp_sso",
               "reset_password_email_code",
               "ticket",
               "transfer",
@@ -5862,12 +6406,17 @@
           },
           "phone_number_id": {
             "type": "string",
-            "description": "Reserved for `phone_code` (v0.4+)."
+            "description": "For `phone_code`, the `PhoneNumber` to send the SMS to.\nRequired when verifying a specific row in\n`/v1/me/phone-numbers/{id}/challenges`'s context (the parent\n`PhoneNumber.id` is implicit in the URL but supplying it\nagain here makes the body symmetric with `email_address_id`).\nOptional on `SignIn` / `SignUp` parents — the server defaults\nto:\n  - first-factor sign-up — the phone supplied in the\n    `SignUp` attempt;\n  - second-factor sign-in — the user's `default_second_factor`\n    phone, falling back to `User.primary_phone_number_id`.\nSupply explicitly to target a non-default reserved-for-MFA row.\n"
           },
           "redirect_url": {
             "type": "string",
             "format": "uri",
-            "description": "For `email_link`, the URL the magic link bounces back to after\n`clientHandshake` consumes the ticket. Must be on the redirect-URL\nallowlist. Also used by OAuth strategies (v0.4+).\n"
+            "description": "For `email_link`, the URL the magic link bounces back to after\n`clientHandshake` consumes the ticket. For\n`oauth_<provider_key>`, the URL the SDK should land the user on\nif the IdP redirect comes back with `error` (cancellation,\nconsent denied, scope refused). Must be on the redirect-URL\nallowlist on both surfaces.\n"
+          },
+          "redirect_url_complete": {
+            "type": "string",
+            "format": "uri",
+            "description": "For `oauth_<provider_key>`, the URL the SDK should land the\nuser on after the parent flow finishes successfully (or flips\nto `transferable`). Must be on the redirect-URL allowlist.\nRequired when `strategy` starts with `oauth_`; ignored\notherwise.\n"
           }
         },
         "examples": [
@@ -5884,11 +6433,28 @@
             "redirect_url": "https://app.acme.com/dashboard"
           },
           {
+            "strategy": "oauth_google",
+            "redirect_url": "https://app.acme.com/sign-in",
+            "redirect_url_complete": "https://app.acme.com/dashboard"
+          },
+          {
+            "strategy": "oauth_acme_corp_sso",
+            "redirect_url": "https://app.acme.com/sign-in",
+            "redirect_url_complete": "https://app.acme.com/dashboard"
+          },
+          {
             "strategy": "reset_password_email_code",
             "email_address_id": "idn_01HKX9SY9V7H7TF8C8K7J9X4ZE"
           },
           {
             "strategy": "email_code"
+          },
+          {
+            "strategy": "phone_code"
+          },
+          {
+            "strategy": "phone_code",
+            "phone_number_id": "phn_01HKX9SY9V7H7TF8C8K7J9X4ZA"
           },
           {
             "strategy": "domain_dns_txt"
@@ -6226,9 +6792,305 @@
           }
         }
       },
+      "ExternalAccount": {
+        "type": "object",
+        "description": "A `User`'s persistent link to a social-IdP connection driven by an\n`OauthProvider` row. Created by `/v1/oauth-callback/<provider_key>`\non the first successful authorization-code exchange and reused on\nevery subsequent sign-in via the same provider. Powers the\n`<ConnectedAccountsPanel />` UI on `<UserProfile />`.\n\n### Public surface only\n\nThe IdP-issued `access_token`, `refresh_token`, and `id_token` are\nencrypted at rest server-side and **never** appear in any payload.\nThe SDK has no way to read them — server-side resolvers fetch\nfresh userinfo against the stored tokens internally. Sign-in\nresumption uses the platform's own session cookie, not the IdP's\ntokens.\n\n### What the IdP told us\n\n- `provider_user_id` — the IdP's stable identifier for this user\n  (`sub` for OIDC, `id` for plain OAuth 2.0). Unique per\n  `OauthProvider` row; the resolver matches incoming callbacks\n  against this column.\n- `email_address` — the email the IdP returned for this user.\n  Stored verbatim. May or may not match a verified\n  `EmailAddress` on the parent `User` (the resolver de-dupes\n  when the IdP confirms the address as verified — see\n  `verified` below).\n- `scopes` — what the IdP actually granted. May be a subset of\n  `OauthProvider.scopes` (the user can decline scopes on the\n  consent screen).\n- `public_metadata` — free-form bag of raw IdP claims that did\n  not map to any `User` / `ExternalAccount` field via\n  `OauthProvider.attribute_mapping`. Useful for IdP-specific\n  extras (e.g. `groups[]` from a workforce IdP).\n\n### Identifier\n\nID prefix `ext_` (e.g. `ext_01HKX9SY9V7H7TF8C8K7J9X4ZA`).\n",
+        "required": [
+          "id",
+          "object",
+          "provider",
+          "provider_key",
+          "provider_user_id",
+          "email_address",
+          "scopes",
+          "public_metadata",
+          "verified",
+          "linked_at",
+          "last_signed_in_at",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "object": {
+            "type": "string",
+            "const": "external_account"
+          },
+          "provider": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Human-readable IdP label, copied from `OauthProvider.name` at\nlink time (e.g. `\"Google\"`, `\"GitHub\"`, `\"Acme Corp SSO\"`).\nFrozen on the row — renaming the `OauthProvider` does not\nretroactively update existing `ExternalAccount` rows so the SDK\ncan render history correctly.\n"
+          },
+          "provider_key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "maxLength": 64,
+            "description": "Stable slug matching `OauthProvider.provider_key`. Same shape on\nboth ends so the SDK can correlate. Survives provider deletion\n— the row stays so audit trails remain readable, but\nsign-in via that provider stops working.\n",
+            "examples": [
+              "google",
+              "github",
+              "acme_corp_sso"
+            ]
+          },
+          "provider_user_id": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "The IdP's stable identifier for this user (OIDC `sub`, OAuth 2.0\n`id`). Unique per `OauthProvider` row.\n"
+          },
+          "email_address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "email",
+            "maxLength": 254,
+            "description": "Email the IdP returned for this user. `null` for IdPs that\ndon't ship an email claim (rare; some workforce IdPs).\n"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Scopes the IdP actually granted. May be a subset of the requested\n`OauthProvider.scopes` if the user declined some on the consent\nscreen.\n",
+            "examples": [
+              [
+                "openid",
+                "email",
+                "profile"
+              ]
+            ]
+          },
+          "public_metadata": {
+            "$ref": "#/components/schemas/Metadata"
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "`true` when the IdP confirmed the email as verified — mapped\nfrom the OIDC `email_verified` claim (or the equivalent\nOAuth 2.0 userinfo field, depending on\n`OauthProvider.attribute_mapping`). When `true`, the resolver\nwill attach the email to the parent `User`'s\n`email_addresses[]` automatically.\n"
+          },
+          "linked_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "last_signed_in_at": {
+            "description": "Timestamp of the most recent sign-in via this external account.\n`null` until the second sign-in (the first is captured by\n`linked_at`).\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "examples": [
+          {
+            "id": "ext_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+            "object": "external_account",
+            "provider": "Google",
+            "provider_key": "google",
+            "provider_user_id": "112233445566778899001",
+            "email_address": "alice@example.com",
+            "scopes": [
+              "openid",
+              "email",
+              "profile"
+            ],
+            "public_metadata": {
+              "hd": "example.com",
+              "locale": "en"
+            },
+            "verified": true,
+            "linked_at": 1714723000000,
+            "last_signed_in_at": 1714896500000,
+            "created_at": 1714723000000,
+            "updated_at": 1714896500000
+          },
+          {
+            "id": "ext_01HKX9SY9V7H7TF8C8K7J9X4ZB",
+            "object": "external_account",
+            "provider": "GitHub",
+            "provider_key": "github",
+            "provider_user_id": "1742554",
+            "email_address": "alice@example.com",
+            "scopes": [
+              "read:user",
+              "user:email"
+            ],
+            "public_metadata": {
+              "login": "alice-github"
+            },
+            "verified": true,
+            "linked_at": 1714724000000,
+            "last_signed_in_at": null,
+            "created_at": 1714724000000,
+            "updated_at": 1714724000000
+          },
+          {
+            "id": "ext_01HKX9SY9V7H7TF8C8K7J9X4ZC",
+            "object": "external_account",
+            "provider": "Acme Corp SSO",
+            "provider_key": "acme_corp_sso",
+            "provider_user_id": "alice@acme.example",
+            "email_address": "alice@acme.example",
+            "scopes": [
+              "openid",
+              "email",
+              "profile",
+              "groups"
+            ],
+            "public_metadata": {
+              "groups": [
+                "engineering",
+                "sso-admins"
+              ]
+            },
+            "verified": true,
+            "linked_at": 1714725000000,
+            "last_signed_in_at": 1714900000000,
+            "created_at": 1714725000000,
+            "updated_at": 1714900000000
+          }
+        ]
+      },
+      "PhoneNumber": {
+        "type": "object",
+        "description": "A phone identifier owned by a `User`. A user may have many phone\nnumbers; exactly one is the primary (referenced by\n`User.primary_phone_number_id`). A new number starts unverified and\nbecomes a usable identifier once `verified` flips to `true` —\ntypically by issuing and answering a `phone_code` `Challenge`\nagainst `/v1/me/phone-numbers/{id}/challenges`.\n\n### Shape parity with `EmailAddress`\n\nMirrors the v0.2 `EmailAddress` resource: flat `verified: bool` plus\n`current_challenge_id: ?Id` rather than a nested `verification`\nblob (the standalone `Verification` schema was removed in v0.2).\n\n### Phone-number value\n\n`phone_number` is stored in **E.164** form — a leading `+`, the\ncountry-code digits, and the subscriber digits with no separators\n(e.g. `+15555550100`). The server normalises submitted values; the\nrequest body for `POST /v1/me/phone-numbers` accepts any input the\nunderlying parser can normalise but the stored value is always\nE.164.\n\n### Second-factor flags\n\n- `reserved_for_second_factor` — when `true`, this phone is committed\n  to MFA and cannot be unlinked without first nuking the user's MFA\n  state. The FAPI returns `409` on `DELETE /v1/me/phone-numbers/{id}`\n  while this flag is set.\n- `default_second_factor` — when `true`, the SDK's default second-\n  factor picker prefers `phone_code` against this phone over `totp`\n  on `needs_second_factor`. At most one phone per user can carry\n  this flag (the server enforces uniqueness).\n\n### Identifier\n\nID prefix `phn_` (e.g. `phn_01HKX9SY9V7H7TF8C8K7J9X4ZA`).\n",
+        "required": [
+          "id",
+          "object",
+          "phone_number",
+          "verified",
+          "current_challenge_id",
+          "is_primary",
+          "reserved_for_second_factor",
+          "default_second_factor",
+          "linked_to_external_account_id",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "object": {
+            "type": "string",
+            "const": "phone_number"
+          },
+          "phone_number": {
+            "type": "string",
+            "pattern": "^\\+[1-9][0-9]{1,14}$",
+            "maxLength": 16,
+            "description": "The number itself in E.164 form: leading `+`, country-code\ndigits, subscriber digits with no separators.\n",
+            "examples": [
+              "+15555550100",
+              "+5511999990001"
+            ]
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "`true` once a `phone_code` Challenge against this number has\nreached `status: verified`, or the number was minted verified\nvia BAPI with `verified: true`.\n"
+          },
+          "current_challenge_id": {
+            "description": "Pointer to the live `Challenge` if a `phone_code` verification\nis in flight against this number. `null` when no challenge has\nbeen issued yet, the previous one was answered to a terminal\nstatus, or the number was created already verified.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "is_primary": {
+            "type": "boolean",
+            "description": "`true` when this row is the user's primary phone — i.e.\n`User.primary_phone_number_id == id`. Convenience flag; the\npointer on `User` is the source of truth.\n"
+          },
+          "reserved_for_second_factor": {
+            "type": "boolean",
+            "description": "`true` when this phone is committed to second-factor MFA.\n`DELETE /v1/me/phone-numbers/{id}` is refused (`409`) while this\nflag is set — the user must first disable phone-MFA via\n`PATCH` (clearing `reserved_for_second_factor`) or via the\noperator-driven `DELETE /v1/users/{id}/mfa`.\n"
+          },
+          "default_second_factor": {
+            "type": "boolean",
+            "description": "`true` when this phone is the user's default second factor.\nAt most one phone per user carries this flag. The SDK uses it\nto pre-select `phone_code` over `totp` on\n`needs_second_factor` when both are available.\n"
+          },
+          "linked_to_external_account_id": {
+            "description": "Pointer to the `ExternalAccount` that surfaced this number, if\nany. `null` for numbers added directly by the user via\n`POST /v1/me/phone-numbers`.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reserved": {
+            "type": "boolean",
+            "default": false,
+            "description": "`true` when the number is held by an `AllowlistIdentifier` /\n`Invitation` and is not yet attached to a user account.\n"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "examples": [
+          {
+            "id": "phn_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+            "object": "phone_number",
+            "phone_number": "+15555550100",
+            "verified": true,
+            "current_challenge_id": null,
+            "is_primary": true,
+            "reserved_for_second_factor": false,
+            "default_second_factor": false,
+            "linked_to_external_account_id": null,
+            "created_at": 1714723000000,
+            "updated_at": 1714723000000
+          },
+          {
+            "id": "phn_01HKX9SY9V7H7TF8C8K7J9X4ZB",
+            "object": "phone_number",
+            "phone_number": "+15555550101",
+            "verified": false,
+            "current_challenge_id": "chal_01HKX9SY9V7H7TF8C8K7J9X4ZE",
+            "is_primary": false,
+            "reserved_for_second_factor": false,
+            "default_second_factor": false,
+            "linked_to_external_account_id": null,
+            "created_at": 1714723000000,
+            "updated_at": 1714723000000
+          },
+          {
+            "id": "phn_01HKX9SY9V7H7TF8C8K7J9X4ZC",
+            "object": "phone_number",
+            "phone_number": "+15555550102",
+            "verified": true,
+            "current_challenge_id": null,
+            "is_primary": false,
+            "reserved_for_second_factor": true,
+            "default_second_factor": true,
+            "linked_to_external_account_id": null,
+            "created_at": 1714723000000,
+            "updated_at": 1714723000000
+          }
+        ]
+      },
       "User": {
         "type": "object",
-        "description": "An end-user identity within an `Environment`. Carries the canonical\nidentifier set (email addresses, phone numbers, external accounts,\npasskeys), the auth-state flags (password, MFA), the moderation state\n(banned, locked), the lifecycle timestamps, and the three flavours of\nmetadata.\n\nPhone numbers, external accounts, enterprise accounts, and passkeys\nare present in the shape today (as empty arrays in v0.1) so SDKs can\ngenerate stable types up front; the corresponding endpoints land in\nlater milestones (v0.4 / v0.5 / v0.6).\n",
+        "description": "An end-user identity within an `Environment`. Carries the canonical\nidentifier set (email addresses, phone numbers, external accounts,\npasskeys), the auth-state flags (password, MFA), the moderation state\n(banned, locked), the lifecycle timestamps, and the three flavours of\nmetadata.\n\nExternal accounts, enterprise accounts, and passkeys are present in\nthe shape today (as empty arrays before their respective milestones\nship) so SDKs can generate stable types up front; the corresponding\nendpoints land in later milestones (v0.5 / v0.6).\n",
         "required": [
           "id",
           "object",
@@ -6314,7 +7176,7 @@
               "string",
               "null"
             ],
-            "description": "Pointer into `phone_numbers[]`. v0.1 always returns `null` (phone\nidentifiers ship in v0.4).\n"
+            "description": "Pointer into `phone_numbers[]`. `null` for users with no verified\nphone (e.g. email-only accounts).\n"
           },
           "email_addresses": {
             "type": "array",
@@ -6324,18 +7186,14 @@
           },
           "phone_numbers": {
             "type": "array",
-            "description": "Reserved for v0.4. Always returned as `[]` in v0.1.\n",
             "items": {
-              "type": "object",
-              "additionalProperties": true
+              "$ref": "#/components/schemas/PhoneNumber"
             }
           },
           "external_accounts": {
             "type": "array",
-            "description": "Reserved for v0.4 (OAuth connections). Always `[]` in v0.1.\n",
             "items": {
-              "type": "object",
-              "additionalProperties": true
+              "$ref": "#/components/schemas/ExternalAccount"
             }
           },
           "enterprise_accounts": {
@@ -7461,11 +8319,12 @@
           },
           "multi_factor": {
             "type": "object",
-            "description": "Per-environment MFA strategy gating. The FAPI consults these\nflags before issuing a `totp` / `backup_code` Challenge or\naccepting `POST /v1/me/totp` / `POST /v1/me/backup-codes`. A\nstrategy that's `enabled: false` is omitted from\n`SignIn.supported_strategies` even if a user has stale\nenrollment rows for it (the rows survive the toggle but can't\nbe used to complete sign-in).\n",
+            "description": "Per-environment MFA strategy gating. The FAPI consults these\nflags before issuing a `totp` / `backup_code` / `phone_code`\nChallenge or accepting the corresponding enrollment endpoint\n(`POST /v1/me/totp`, `POST /v1/me/backup-codes`,\n`PATCH /v1/me/phone-numbers/{id}` with\n`reserved_for_second_factor: true`). A strategy that's\n`enabled: false` is omitted from\n`SignIn.supported_strategies` even if a user has stale\nenrollment rows for it (the rows survive the toggle but can't\nbe used to complete sign-in).\n",
             "additionalProperties": false,
             "required": [
               "totp",
-              "backup_codes"
+              "backup_codes",
+              "phone_code"
             ],
             "properties": {
               "totp": {
@@ -7501,6 +8360,20 @@
                     "maximum": 24,
                     "default": 10,
                     "description": "How many codes `POST /v1/me/backup-codes` mints per\nregeneration request. Bounds chosen so the typical\nprintable card stays readable; raise for environments\nthat want more headroom.\n"
+                  }
+                }
+              },
+              "phone_code": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "enabled"
+                ],
+                "properties": {
+                  "enabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "When `false` (the default), refuses flipping\n`PhoneNumber.reserved_for_second_factor` to `true` and\nexcludes `phone_code` from second-factor\n`supported_strategies`. Existing\n`reserved_for_second_factor` rows survive the toggle but\ncannot complete sign-in until the env re-enables phone\nMFA. Defaults to `false` because SMS MFA carries real\ncost (carrier fees) and SIM-swap risk — operators opt\nin explicitly.\n"
                   }
                 }
               }
@@ -7641,6 +8514,15 @@
                     "maximum": 24
                   }
                 }
+              },
+              "phone_code": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  }
+                }
               }
             }
           },
@@ -7707,7 +8589,7 @@
           },
           "type": {
             "type": "string",
-            "description": "Stable event type identifier. v0.1 shipped the `user.*`,\n`session.*`, `email.*`, and `invitation.*` events. v0.2 adds the\norganization, role, and permission events listed below.\n\nFuture surfaces (OAuth, enterprise SSO, SCIM) will be added\nadditively under their own milestones.\n",
+            "description": "Stable event type identifier. v0.1 shipped the `user.*`,\n`session.*`, `email.*`, and `invitation.*` events. v0.2 adds the\norganization, role, and permission events. v0.4 adds the\nsocial-IdP, external-account, and phone-number events.\n\nFuture surfaces (enterprise SSO, SCIM) will be added additively\nunder their own milestones.\n",
             "enum": [
               "user.created",
               "user.updated",
@@ -7741,11 +8623,19 @@
               "role.deleted",
               "permission.created",
               "permission.updated",
-              "permission.deleted"
+              "permission.deleted",
+              "oauthProvider.created",
+              "oauthProvider.updated",
+              "oauthProvider.deleted",
+              "externalAccount.connected",
+              "externalAccount.unlinked",
+              "phoneNumber.created",
+              "phoneNumber.verified",
+              "phoneNumber.removed"
             ]
           },
           "data": {
-            "description": "The resource snapshot. Concrete shape depends on `type`:\n\n- `user.*` → `User`\n- `session.*` → `Session`\n- `email.*` → `EmailAddress`\n- `invitation.*` → `Invitation`\n- `organization.*` → `Organization`\n- `organizationMembership.*` → `OrganizationMembership` (with\n  populated `public_user_data`, so handlers don't need a\n  follow-up `getUser`)\n- `organizationInvitation.*` → `OrganizationInvitation`\n- `organizationDomain.*` → `OrganizationDomain`\n- `organizationMembershipRequest.*` → `OrganizationMembershipRequest`\n- `role.*` → `Role`\n- `permission.*` → `Permission` (custom permissions only —\n  system permissions are seeded and don't emit lifecycle events)\n",
+            "description": "The resource snapshot. Concrete shape depends on `type`:\n\n- `user.*` → `User`\n- `session.*` → `Session`\n- `email.*` → `EmailAddress`\n- `invitation.*` → `Invitation`\n- `organization.*` → `Organization`\n- `organizationMembership.*` → `OrganizationMembership` (with\n  populated `public_user_data`, so handlers don't need a\n  follow-up `getUser`)\n- `organizationInvitation.*` → `OrganizationInvitation`\n- `organizationDomain.*` → `OrganizationDomain`\n- `organizationMembershipRequest.*` → `OrganizationMembershipRequest`\n- `role.*` → `Role`\n- `permission.*` → `Permission` (custom permissions only —\n  system permissions are seeded and don't emit lifecycle events)\n- `oauthProvider.*` → `OauthProvider` (`client_secret` is never\n  in the payload — encrypted at rest, write-only)\n- `externalAccount.*` → `ExternalAccount` (the IdP-issued\n  `access_token` / `refresh_token` / `id_token` are never in the\n  payload either)\n- `phoneNumber.*` → `PhoneNumber`\n",
             "oneOf": [
               {
                 "$ref": "#/components/schemas/User"
@@ -7779,6 +8669,15 @@
               },
               {
                 "$ref": "#/components/schemas/Permission"
+              },
+              {
+                "$ref": "#/components/schemas/OauthProvider"
+              },
+              {
+                "$ref": "#/components/schemas/ExternalAccount"
+              },
+              {
+                "$ref": "#/components/schemas/PhoneNumber"
               }
             ]
           },
@@ -9172,6 +10071,720 @@
             }
           }
         }
+      },
+      "OauthProvider": {
+        "type": "object",
+        "description": "Per-environment social-IdP configuration. The SDK reads `OauthProvider`\nrows to render `<SocialButtons />`; the server reads them to drive the\n`oauth_<provider_key>` first-factor `Challenge` strategy. Three kinds\nshare a single shape:\n\n- `preset` — bundled IdPs the platform ships with (`google`, `github`,\n  `apple`, `microsoft`). The OIDC discovery fields and default scope\n  set are filled in by the platform on create; the operator only\n  supplies `client_id`, `client_secret`, and any toggles\n  (`enabled`, `allow_sign_in`, …).\n- `custom_oidc` — workspace-registered OpenID Connect IdP. The\n  operator supplies an `issuer` URL; the server fetches and caches\n  `<issuer>/.well-known/openid-configuration` and populates the OIDC\n  endpoint fields automatically. `discovery_endpoint`,\n  `authorization_endpoint`, `token_endpoint`, `userinfo_endpoint`,\n  `jwks_uri`, `id_token_signing_algs[]` are read-only when populated\n  by discovery, but admin-overridable for self-host edge cases where\n  discovery is unreachable.\n- `custom_oauth2` — workspace-registered plain OAuth 2.0 IdP without\n  OIDC. The operator supplies `authorization_endpoint`,\n  `token_endpoint`, and `userinfo_endpoint` directly, plus\n  `userinfo_method` (`GET` / `POST`) and `userinfo_auth` (`bearer` /\n  `basic` / `query`) so the server knows how to call the userinfo\n  endpoint.\n\n### Secret handling\n\n`client_secret` is **write-only**. It's accepted on\n`POST /v1/oauth-providers` and `PATCH /v1/oauth-providers/{id}` (see\n`OauthProviderRequest`), encrypted at rest, and never returned in any\nresponse. The public payload exposes `client_id` only.\n\n### Computed redirect_uri\n\n`redirect_uri` is computed server-side as\n`https://<env_slug>.authn.sh/v1/oauth-callback/<provider_key>` and is\nread-only. It's the value the operator must register with the IdP.\n\n### attribute_mapping\n\nMap of authn.sh `User` / `ExternalAccount` fields to IdP claim or\nuserinfo paths. Presets ship with sensible defaults\n(`email_address` → `email`, `first_name` → `given_name`,\n`last_name` → `family_name`, …); operators can override per row to\nmatch a non-standard IdP.\n\n### Identifier\n\nID prefix `oauthp_` (e.g. `oauthp_01HKX9SY9V7H7TF8C8K7J9X4ZA`).\n",
+        "required": [
+          "id",
+          "object",
+          "provider_kind",
+          "provider_key",
+          "name",
+          "enabled",
+          "allow_sign_in",
+          "allow_sign_up",
+          "block_email_subaddresses",
+          "client_id",
+          "scopes",
+          "additional_authorization_params",
+          "attribute_mapping",
+          "redirect_uri",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "object": {
+            "type": "string",
+            "const": "oauth_provider"
+          },
+          "provider_kind": {
+            "type": "string",
+            "enum": [
+              "preset",
+              "custom_oidc",
+              "custom_oauth2"
+            ],
+            "description": "Discriminates which subset of fields applies. Immutable after\ncreate.\n"
+          },
+          "provider_key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "maxLength": 64,
+            "description": "Stable slug used in the `oauth_<provider_key>` `Challenge.strategy`\nand in the computed `redirect_uri`. For `provider_kind: \"preset\"`\nthis is one of the bundled values (`google`, `github`, `apple`,\n`microsoft`). For `custom_oidc` / `custom_oauth2` it's a\nworkspace-chosen slug, unique per environment.\n",
+            "examples": [
+              "google",
+              "github",
+              "apple",
+              "microsoft",
+              "acme_corp_sso"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "Human-readable label rendered in `<SocialButtons />`."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "When `false`, the provider is hidden from the SDK and the\n`oauth_<provider_key>` strategy is rejected by the FAPI. The row\nsurvives the toggle so existing `ExternalAccount` links remain\nvalid.\n"
+          },
+          "allow_sign_in": {
+            "type": "boolean",
+            "description": "When `true`, an unsigned-in user can authenticate with this\nprovider via the `oauth_<provider_key>` strategy on a `SignIn`.\n"
+          },
+          "allow_sign_up": {
+            "type": "boolean",
+            "description": "When `true`, a first-time visitor can complete a `SignUp` via\nthis provider. With `allow_sign_in: true` and `allow_sign_up: false`\nthe provider is sign-in-only — the callback rejects unknown\nidentifiers instead of creating a `User`.\n"
+          },
+          "block_email_subaddresses": {
+            "type": "boolean",
+            "description": "When `true`, addresses with a `+tag` segment returned by the IdP\nare refused at sign-up under this provider. Mirrors the\ninstance-level `restrictions.block_email_subaddresses` knob but\nscoped per-provider.\n"
+          },
+          "client_id": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "OAuth 2.0 client identifier issued by the IdP. Public — sent on\nevery `/authorize` redirect.\n"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Scope set requested on the `/authorize` redirect. Presets ship\nwith a sensible default (`openid email profile` for OIDC presets;\n`read:user user:email` for GitHub; etc.); operators can add\nprovider-specific scopes here without spec changes.\n",
+            "examples": [
+              [
+                "openid",
+                "email",
+                "profile"
+              ]
+            ]
+          },
+          "additional_authorization_params": {
+            "type": "object",
+            "description": "Free-form `key=value` pairs merged into the `/authorize` query\nstring after the standard params (`client_id`, `redirect_uri`,\n`scope`, `state`, …). Useful for IdP-specific knobs like Google's\n`prompt=select_account` or Microsoft's `tenant=common`.\n",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "attribute_mapping": {
+            "type": "object",
+            "description": "Map of authn.sh field names (keys) to IdP claim or userinfo paths\n(values). Keys are the standard `User` / `ExternalAccount` field\nnames: `email_address`, `first_name`, `last_name`,\n`profile_image_url`, `provider_user_id`. Values are dot-separated\nJSON paths into the OIDC ID token claims (or userinfo body for\nOAuth 2.0).\n",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "examples": [
+              {
+                "email_address": "email",
+                "first_name": "given_name",
+                "last_name": "family_name",
+                "profile_image_url": "picture",
+                "provider_user_id": "sub"
+              }
+            ]
+          },
+          "redirect_uri": {
+            "type": "string",
+            "format": "uri",
+            "readOnly": true,
+            "description": "Server-computed callback URL the IdP must redirect to after the\nauthorization code grant. Format:\n`https://<env_slug>.authn.sh/v1/oauth-callback/<provider_key>`.\nOperators register this exact value with the IdP's developer\nconsole.\n",
+            "examples": [
+              "https://acme.authn.sh/v1/oauth-callback/google"
+            ]
+          },
+          "issuer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "OIDC issuer URL. Required for `provider_kind: \"custom_oidc\"` (the\nserver fetches `<issuer>/.well-known/openid-configuration` from\nthis base). Set by the platform for `preset` rows. `null` for\n`custom_oauth2`.\n"
+          },
+          "discovery_endpoint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "Resolved OIDC discovery document URL. Populated by the server\nfrom `issuer` for `preset` and `custom_oidc` rows; admin-\noverridable for self-host edge cases where the standard\n`/.well-known/openid-configuration` path is wrong. `null` for\n`custom_oauth2`.\n"
+          },
+          "authorization_endpoint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "`/authorize` URL. Populated by discovery for `preset` /\n`custom_oidc`; supplied directly by the operator for\n`custom_oauth2`.\n"
+          },
+          "token_endpoint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "Token exchange URL. Populated by discovery for `preset` /\n`custom_oidc`; supplied directly by the operator for\n`custom_oauth2`.\n"
+          },
+          "userinfo_endpoint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "Userinfo URL. Populated by discovery for `preset` /\n`custom_oidc`; supplied directly by the operator for\n`custom_oauth2`. `null` is allowed for OIDC providers that ship\nevery required claim in the ID token (the server falls back to\nID-token claims when this is `null`).\n"
+          },
+          "jwks_uri": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "JWKS URL used to verify the OIDC ID token signature. Populated\nby discovery for `preset` / `custom_oidc`; admin-overridable.\n`null` for `custom_oauth2`.\n"
+          },
+          "id_token_signing_algs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Algorithms the IdP advertises for ID token signing (e.g. `RS256`,\n`ES256`). Populated by discovery for `preset` / `custom_oidc`;\nempty for `custom_oauth2`.\n",
+            "examples": [
+              [
+                "RS256"
+              ]
+            ]
+          },
+          "userinfo_method": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "GET",
+              "POST",
+              null
+            ],
+            "description": "HTTP method used to call `userinfo_endpoint`. Required for\n`provider_kind: \"custom_oauth2\"`; `null` for OIDC kinds (those\nalways use `GET` per the OIDC core spec).\n"
+          },
+          "userinfo_auth": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "bearer",
+              "basic",
+              "query",
+              null
+            ],
+            "description": "How the access token is presented when calling\n`userinfo_endpoint`. `bearer` — `Authorization: Bearer <token>`\nheader. `basic` — HTTP Basic with the access token as the\nusername. `query` — `?access_token=<token>` query string.\nRequired for `provider_kind: \"custom_oauth2\"`; `null` for OIDC\nkinds (those always use `bearer`).\n"
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "examples": [
+          {
+            "id": "oauthp_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+            "object": "oauth_provider",
+            "provider_kind": "preset",
+            "provider_key": "google",
+            "name": "Google",
+            "enabled": true,
+            "allow_sign_in": true,
+            "allow_sign_up": true,
+            "block_email_subaddresses": false,
+            "client_id": "123456789012-abc.apps.googleusercontent.com",
+            "scopes": [
+              "openid",
+              "email",
+              "profile"
+            ],
+            "additional_authorization_params": {
+              "prompt": "select_account"
+            },
+            "attribute_mapping": {
+              "email_address": "email",
+              "first_name": "given_name",
+              "last_name": "family_name",
+              "profile_image_url": "picture",
+              "provider_user_id": "sub"
+            },
+            "redirect_uri": "https://acme.authn.sh/v1/oauth-callback/google",
+            "issuer": "https://accounts.google.com",
+            "discovery_endpoint": "https://accounts.google.com/.well-known/openid-configuration",
+            "authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
+            "token_endpoint": "https://oauth2.googleapis.com/token",
+            "userinfo_endpoint": "https://openidconnect.googleapis.com/v1/userinfo",
+            "jwks_uri": "https://www.googleapis.com/oauth2/v3/certs",
+            "id_token_signing_algs": [
+              "RS256"
+            ],
+            "userinfo_method": null,
+            "userinfo_auth": null,
+            "created_at": 1714723000000,
+            "updated_at": 1714723000000
+          },
+          {
+            "id": "oauthp_01HKX9SY9V7H7TF8C8K7J9X4ZB",
+            "object": "oauth_provider",
+            "provider_kind": "custom_oidc",
+            "provider_key": "acme_corp_sso",
+            "name": "Acme Corp SSO",
+            "enabled": true,
+            "allow_sign_in": true,
+            "allow_sign_up": false,
+            "block_email_subaddresses": true,
+            "client_id": "acme-authn-prod",
+            "scopes": [
+              "openid",
+              "email",
+              "profile",
+              "groups"
+            ],
+            "additional_authorization_params": {},
+            "attribute_mapping": {
+              "email_address": "email",
+              "first_name": "given_name",
+              "last_name": "family_name",
+              "provider_user_id": "sub"
+            },
+            "redirect_uri": "https://acme.authn.sh/v1/oauth-callback/acme_corp_sso",
+            "issuer": "https://sso.acme.example",
+            "discovery_endpoint": "https://sso.acme.example/.well-known/openid-configuration",
+            "authorization_endpoint": "https://sso.acme.example/authorize",
+            "token_endpoint": "https://sso.acme.example/token",
+            "userinfo_endpoint": "https://sso.acme.example/userinfo",
+            "jwks_uri": "https://sso.acme.example/jwks",
+            "id_token_signing_algs": [
+              "RS256",
+              "ES256"
+            ],
+            "userinfo_method": null,
+            "userinfo_auth": null,
+            "created_at": 1714723000000,
+            "updated_at": 1714723000000
+          },
+          {
+            "id": "oauthp_01HKX9SY9V7H7TF8C8K7J9X4ZC",
+            "object": "oauth_provider",
+            "provider_kind": "custom_oauth2",
+            "provider_key": "legacy_idp",
+            "name": "Legacy IdP",
+            "enabled": true,
+            "allow_sign_in": true,
+            "allow_sign_up": true,
+            "block_email_subaddresses": false,
+            "client_id": "legacy-client",
+            "scopes": [
+              "read_profile",
+              "read_email"
+            ],
+            "additional_authorization_params": {},
+            "attribute_mapping": {
+              "email_address": "email",
+              "provider_user_id": "id"
+            },
+            "redirect_uri": "https://acme.authn.sh/v1/oauth-callback/legacy_idp",
+            "issuer": null,
+            "discovery_endpoint": null,
+            "authorization_endpoint": "https://idp.legacy.example/oauth/authorize",
+            "token_endpoint": "https://idp.legacy.example/oauth/token",
+            "userinfo_endpoint": "https://idp.legacy.example/api/me",
+            "jwks_uri": null,
+            "id_token_signing_algs": [],
+            "userinfo_method": "GET",
+            "userinfo_auth": "bearer",
+            "created_at": 1714723000000,
+            "updated_at": 1714723000000
+          }
+        ]
+      },
+      "OauthProviderRequest": {
+        "type": "object",
+        "description": "Request body for `POST /v1/oauth-providers` and\n`PATCH /v1/oauth-providers/{id}`. Mirrors `OauthProvider` minus the\nserver-computed fields (`id`, `object`, `redirect_uri`, `created_at`,\n`updated_at`) and adds the write-only `client_secret`.\n\n### POST vs PATCH\n\n- On `POST`, `provider_kind`, `provider_key`, `name`, and `client_id`\n  are required. For `provider_kind: \"custom_oidc\"` the operator must\n  also supply `issuer`. For `provider_kind: \"custom_oauth2\"` the\n  operator must supply `authorization_endpoint`, `token_endpoint`,\n  `userinfo_endpoint`, `userinfo_method`, and `userinfo_auth`.\n  `client_secret` is required on `POST` for every kind except where\n  the IdP does not issue one (rare; PKCE-only flows).\n- On `PATCH`, every field is optional and only the keys present in\n  the body are updated. `provider_kind` and `provider_key` are\n  immutable — sending a different value returns `422`.\n\n### client_secret\n\nWrite-only string. Accepted on POST/PATCH, encrypted at rest, and\nnever returned in any response. Sending an empty string or omitting\nthe key on PATCH leaves the stored value unchanged. Sending `null`\non PATCH clears the stored secret (e.g. when migrating to a PKCE-\nonly flow).\n",
+        "additionalProperties": false,
+        "properties": {
+          "provider_kind": {
+            "type": "string",
+            "enum": [
+              "preset",
+              "custom_oidc",
+              "custom_oauth2"
+            ],
+            "description": "Required on `POST`; immutable on `PATCH`. Discriminates which\nsubset of fields applies on this row.\n"
+          },
+          "provider_key": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$",
+            "maxLength": 64,
+            "description": "Required on `POST`; immutable on `PATCH`. For `preset` rows must\nbe one of `google` / `github` / `apple` / `microsoft`.\n"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "allow_sign_in": {
+            "type": "boolean",
+            "default": true
+          },
+          "allow_sign_up": {
+            "type": "boolean",
+            "default": true
+          },
+          "block_email_subaddresses": {
+            "type": "boolean",
+            "default": false
+          },
+          "client_id": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "client_secret": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "writeOnly": true,
+            "maxLength": 1024,
+            "description": "Write-only. Encrypted at rest; never returned by any GET.\nOmit on PATCH to leave the stored value untouched; send `null`\nto clear it.\n"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Overrides the preset-default scope set when supplied. Omit on\n`POST` for `preset` rows to use the platform-default scopes.\n"
+          },
+          "additional_authorization_params": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "attribute_mapping": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "issuer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "Required on `POST` for `provider_kind: \"custom_oidc\"`. The server\nruns OIDC discovery from this base and populates the endpoint\nfields. Ignored for `custom_oauth2`.\n"
+          },
+          "discovery_endpoint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "Optional override for `<issuer>/.well-known/openid-configuration`.\nOnly used by `preset` / `custom_oidc` rows that need a non-\nstandard discovery URL.\n"
+          },
+          "authorization_endpoint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "Required on `POST` for `provider_kind: \"custom_oauth2\"`. Admin\noverride for OIDC kinds when discovery cannot reach the IdP.\n"
+          },
+          "token_endpoint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "Required on `POST` for `provider_kind: \"custom_oauth2\"`. Admin\noverride for OIDC kinds.\n"
+          },
+          "userinfo_endpoint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "Required on `POST` for `provider_kind: \"custom_oauth2\"`. Optional\nfor OIDC kinds that ship every required claim in the ID token.\n"
+          },
+          "jwks_uri": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
+          },
+          "id_token_signing_algs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "userinfo_method": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "GET",
+              "POST",
+              null
+            ],
+            "description": "Required on `POST` for `provider_kind: \"custom_oauth2\"`. `null`\nfor OIDC kinds.\n"
+          },
+          "userinfo_auth": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "bearer",
+              "basic",
+              "query",
+              null
+            ],
+            "description": "Required on `POST` for `provider_kind: \"custom_oauth2\"`. `null`\nfor OIDC kinds.\n"
+          }
+        },
+        "examples": [
+          {
+            "provider_kind": "preset",
+            "provider_key": "google",
+            "name": "Google",
+            "enabled": true,
+            "allow_sign_in": true,
+            "allow_sign_up": true,
+            "block_email_subaddresses": false,
+            "client_id": "123456789012-abc.apps.googleusercontent.com",
+            "client_secret": "GOCSPX-xxxxxxxxxxxxxxxxxxxxxxxxx",
+            "additional_authorization_params": {
+              "prompt": "select_account"
+            }
+          },
+          {
+            "provider_kind": "custom_oidc",
+            "provider_key": "acme_corp_sso",
+            "name": "Acme Corp SSO",
+            "client_id": "acme-authn-prod",
+            "client_secret": "shhhh",
+            "issuer": "https://sso.acme.example",
+            "scopes": [
+              "openid",
+              "email",
+              "profile",
+              "groups"
+            ],
+            "allow_sign_up": false,
+            "block_email_subaddresses": true
+          },
+          {
+            "provider_kind": "custom_oauth2",
+            "provider_key": "legacy_idp",
+            "name": "Legacy IdP",
+            "client_id": "legacy-client",
+            "client_secret": "legacy-secret",
+            "authorization_endpoint": "https://idp.legacy.example/oauth/authorize",
+            "token_endpoint": "https://idp.legacy.example/oauth/token",
+            "userinfo_endpoint": "https://idp.legacy.example/api/me",
+            "userinfo_method": "GET",
+            "userinfo_auth": "bearer",
+            "scopes": [
+              "read_profile",
+              "read_email"
+            ],
+            "attribute_mapping": {
+              "email_address": "email",
+              "provider_user_id": "id"
+            }
+          }
+        ]
+      },
+      "OauthProviderTestResult": {
+        "type": "object",
+        "description": "Result of `POST /v1/oauth-providers/{id}/test`. The dashboard uses\nthis shape to render a per-provider health indicator on the Social\nproviders configuration page. Always returned with HTTP `200` even\nwhen probes fail — inspect `errors[]` to decide pass/fail.\n",
+        "required": [
+          "authorize_url",
+          "userinfo_status",
+          "errors"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "authorize_url": {
+            "type": "string",
+            "description": "The fully-formed `/authorize` URL the SDK would redirect a user\nto right now (with a synthetic `state` and the registered\n`redirect_uri`). Empty string when the server could not build\nit (e.g. OIDC discovery refresh failed and no cached endpoint\nexists).\n",
+            "examples": [
+              "https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=123-abc.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Facme.authn.sh%2Fv1%2Foauth-callback%2Fgoogle&scope=openid+email+profile&state=test_01HKX9SY9V7H7TF8C8K7J9X4ZA"
+            ]
+          },
+          "userinfo_status": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 100,
+            "maximum": 599,
+            "description": "HTTP status code returned by the unauthenticated probe of\n`userinfo_endpoint` (the server sends a token-less HEAD/GET and\nrecords what came back). `401` / `403` are healthy — the\nendpoint is reachable and refused the missing token. `5xx` and\ntimeouts surface a problem on the IdP side. `null` when the\nprovider has no `userinfo_endpoint` (some OIDC IdPs ship every\nclaim in the ID token).\n"
+          },
+          "errors": {
+            "type": "array",
+            "description": "Collected probe errors. Empty when every check passed. Each\nentry uses the standard `Error` shape (`code` is a stable\nmachine-readable token; SDKs match on it).\n",
+            "items": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "examples": [
+          {
+            "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=123-abc.apps.googleusercontent.com&redirect_uri=https%3A%2F%2Facme.authn.sh%2Fv1%2Foauth-callback%2Fgoogle&scope=openid+email+profile&state=test_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+            "userinfo_status": 401,
+            "errors": []
+          },
+          {
+            "authorize_url": "",
+            "userinfo_status": null,
+            "errors": [
+              {
+                "code": "oauth_discovery_refresh_failed",
+                "message": "Could not refresh /.well-known/openid-configuration",
+                "long_message": "The cached OIDC discovery document is older than 24h and a refresh attempt timed out. Verify the issuer URL and that the discovery endpoint is reachable from authn.sh."
+              }
+            ]
+          }
+        ]
+      },
+      "SmsTemplate": {
+        "type": "object",
+        "description": "Per-environment SMS body customization for one of a fixed set of\noutbound message slugs (verification codes, password resets,\ninvitations). Each environment is seeded with a default row per slug\non creation; operators edit the body or flip `delivered_by_us` to\nhand off sending to their own webhook.\n\n### Slugs\n\n- `verification_code` — first-factor sign-up phone verification\n  + standalone `PhoneNumber` verification + second-factor SMS MFA.\n  The `phone_code` strategy renders this template.\n- `reset_password_code` — SMS variant of the password-reset flow\n  (when the env's `reset_password` strategy is configured to use\n  SMS rather than email). Reserved for v0.5; the row exists in\n  v0.4 so operators can prep their copy.\n- `invitation` — operator-driven invitation SMS. Mirrors\n  `Invitation` (v0.1) but for phone-based invites; reserved for\n  v0.5.\n\n### Body templating\n\n`body` is a Liquid-style template with `{{placeholder}}`\ninterpolation. Standard placeholders:\n\n- `{{otp_code}}` — the 6-digit numeric code (verification +\n  reset).\n- `{{app.name}}` — the environment's `display_config.application_name`.\n- `{{app.url}}` — the environment's `display_config.home_url`.\n- `{{user.first_name}}` / `{{user.last_name}}` — when the message\n  has a known recipient.\n- `{{ttl_minutes}}` — how long the code remains valid (currently\n  fixed at 10 minutes for `verification_code`).\n\nUnknown placeholders render as the empty string.\n\n### `delivered_by_us`\n\nWhen `true` (default), authn.sh's SMS engine sends the message via\nthe env's `Environment.sms.driver`. When `false`, the engine emits\nan `sms.queued` audit-log entry and a webhook event but does not\ncall any driver — the operator's webhook handler is expected to\ntake over and send the SMS through their own carrier relationship.\n\n### Identifier\n\nID prefix `tmpl_` (e.g. `tmpl_01HKX9SY9V7H7TF8C8K7J9X4ZA`). Shared\nwith future `EmailTemplate` rows.\n",
+        "required": [
+          "id",
+          "object",
+          "slug",
+          "body",
+          "delivered_by_us",
+          "from_number_override",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "object": {
+            "type": "string",
+            "const": "sms_template"
+          },
+          "slug": {
+            "type": "string",
+            "enum": [
+              "verification_code",
+              "reset_password_code",
+              "invitation"
+            ],
+            "description": "Stable identifier the SMS engine looks up at send time.\nImmutable on the row.\n"
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 1600,
+            "description": "Liquid-style template body. The 1600-char ceiling matches the\nmulti-segment SMS upper bound; messages over 160 chars\nauto-split into multiple segments at the carrier.\n",
+            "examples": [
+              "Your {{app.name}} verification code is {{otp_code}}. It expires in {{ttl_minutes}} minutes.",
+              "{{user.first_name}}, your one-time code: {{otp_code}}"
+            ]
+          },
+          "delivered_by_us": {
+            "type": "boolean",
+            "default": true,
+            "description": "When `true` (the default), authn.sh sends the SMS via the env's\n`Environment.sms.driver`. When `false`, the operator handles\nsending via webhook — the server emits an `sms.queued` event\nbut does not call any driver.\n"
+          },
+          "from_number_override": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\+[1-9][0-9]{1,14}$",
+            "maxLength": 16,
+            "description": "Per-template override of `Environment.sms.from_number` in E.164\nform. Useful when `verification_code` should send from a\nbranded short code while `invitation` uses a long-form number.\n`null` falls through to the env default.\n",
+            "examples": [
+              "+15555550100"
+            ]
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "examples": [
+          {
+            "id": "tmpl_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+            "object": "sms_template",
+            "slug": "verification_code",
+            "body": "Your {{app.name}} verification code is {{otp_code}}. It expires in {{ttl_minutes}} minutes.",
+            "delivered_by_us": true,
+            "from_number_override": null,
+            "created_at": 1714723000000,
+            "updated_at": 1714723000000
+          },
+          {
+            "id": "tmpl_01HKX9SY9V7H7TF8C8K7J9X4ZB",
+            "object": "sms_template",
+            "slug": "invitation",
+            "body": "{{user.first_name}}, you've been invited to {{app.name}}. Tap to join: {{app.url}}/accept-invite",
+            "delivered_by_us": false,
+            "from_number_override": "+15555550111",
+            "created_at": 1714723000000,
+            "updated_at": 1714896500000
+          }
+        ]
+      },
+      "SmsTemplateRequest": {
+        "type": "object",
+        "description": "Body for `PATCH /v1/sms-templates/{slug}`. All fields optional —\nonly the supplied keys are updated. `slug` itself is immutable\n(it's the URL parameter); `id`, `created_at`, and `updated_at` are\ncomputed.\n",
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "type": "string",
+            "maxLength": 1600,
+            "description": "Liquid-style template body. Multi-segment SMS upper bound;\nmessages over 160 chars auto-split into multiple segments at\nthe carrier.\n"
+          },
+          "delivered_by_us": {
+            "type": "boolean",
+            "description": "When `false`, the operator handles sending via webhook —\nauthn.sh emits the `sms.queued` event but does not call any\ndriver.\n"
+          },
+          "from_number_override": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^\\+[1-9][0-9]{1,14}$",
+            "maxLength": 16,
+            "description": "Per-template override of `Environment.sms.from_number` in\nE.164. `null` clears the override and falls through to the env\ndefault.\n"
+          }
+        },
+        "examples": [
+          {
+            "body": "Your {{app.name}} code: {{otp_code}}"
+          },
+          {
+            "delivered_by_us": false
+          },
+          {
+            "body": "{{user.first_name}}, your one-time code: {{otp_code}}",
+            "from_number_override": "+15555550100"
+          }
+        ]
       }
     },
     "responses": {
