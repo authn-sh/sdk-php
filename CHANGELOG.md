@@ -16,7 +16,7 @@
 - `OrganizationDomainsManager` — `list`, `create`, `get`, `update`, `delete`, `verify`. Accessible via `$client->organizations()->domains($orgId)`.
 - `Client::organizations()` accessor.
 - `UsersManager::listOrganizationMemberships` and `listOrganizationInvitations` now hit the real BAPI endpoints.
-- OpenAPI fixture refreshed to v0.2 bundle.
+- OpenAPI fixture refreshed to v0.2 bundle (route slugs normalised to kebab-case, `WebhookEndpoint` gains `rotation_window_expires_at` / `disabled_at`, `Session` gains optional embedded `user` snapshot).
 
 ### Fixed
 

@@ -1251,7 +1251,7 @@
         }
       }
     },
-    "/v1/email_addresses": {
+    "/v1/email-addresses": {
       "post": {
         "operationId": "createEmailAddress",
         "summary": "Create an email address",
@@ -1343,7 +1343,7 @@
         }
       }
     },
-    "/v1/email_addresses/{email_address_id}": {
+    "/v1/email-addresses/{email_address_id}": {
       "parameters": [
         {
           "name": "email_address_id",
@@ -4517,11 +4517,24 @@
         },
         "responses": {
           "200": {
-            "description": "The updated instance settings.",
+            "description": "The updated organization settings.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InstanceSettings"
+                  "type": "object",
+                  "required": [
+                    "object"
+                  ],
+                  "additionalProperties": true,
+                  "properties": {
+                    "object": {
+                      "type": "string",
+                      "const": "organization_settings"
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    }
+                  }
                 }
               }
             }
@@ -4762,7 +4775,7 @@
       "patch": {
         "operationId": "updateWebhookEndpoint",
         "summary": "Update a webhook endpoint",
-        "description": "Patch any of `url` / `enabled_event_types` / `enabled`. The\n`signing_secret` cannot be set this way — use `rotate_secret`.\n",
+        "description": "Patch any of `url` / `enabled_event_types` / `enabled`. The\n`signing_secret` cannot be set this way — use `rotate-secret`.\n",
         "tags": [
           "Webhooks"
         ],
@@ -4842,7 +4855,7 @@
         }
       }
     },
-    "/v1/webhooks/endpoints/{endpoint_id}/rotate_secret": {
+    "/v1/webhooks/endpoints/{endpoint_id}/rotate-secret": {
       "parameters": [
         {
           "name": "endpoint_id",
@@ -6018,6 +6031,17 @@
           "latest_activity": {
             "$ref": "#/components/schemas/SessionActivity"
           },
+          "user": {
+            "description": "Optional embedded `User` snapshot. Present when the FAPI returns\nthis Session inside a `Client` envelope so the SDK can hydrate\nthe active user without a follow-up `GET /v1/me` round-trip.\nOmitted on standalone `GET /v1/client/sessions/{id}` reads\n(consumers can still fetch the user via the `user_id` field).\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/User"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "created_at": {
             "$ref": "#/components/schemas/Timestamp"
           },
@@ -6811,7 +6835,7 @@
       },
       "OrganizationSettingsUpdateRequest": {
         "type": "object",
-        "description": "Placeholder body for `PATCH /v1/instance/organization-settings`.\nv0.1 only accepts `enabled: false`; the full schema lands in v0.2.\n",
+        "description": "Placeholder body for `PATCH /v1/instance/organization_settings`.\nv0.1 only accepts `enabled: false`; the full schema lands in v0.2.\n",
         "additionalProperties": true,
         "properties": {
           "enabled": {
@@ -7298,6 +7322,22 @@
             "type": "boolean",
             "default": true,
             "description": "When `false`, the dispatcher skips this endpoint without retrying.\nToggled from the dashboard during incidents.\n"
+          },
+          "rotation_window_expires_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "When set, the prior `signing_secret` is still accepted on\nreplay until this timestamp. Cleared once the rotation\nwindow closes.\n"
+          },
+          "disabled_at": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Set by the dispatcher when an endpoint is auto-disabled\nafter sustained delivery failures. `null` while healthy.\n"
           },
           "created_at": {
             "$ref": "#/components/schemas/Timestamp"
@@ -7814,9 +7854,12 @@
             "$ref": "#/components/schemas/Metadata"
           },
           "url": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "format": "uri",
-            "description": "Click-through URL. Carries the ticket plus\n`__authn_status=sign_up` (or `sign_in` when the email is\nalready attached to a `User`) and the org id, so the SDK\nknows which flow to start. The full v0.1 query convention\nlives in PLAN §9.7.\n",
+            "description": "Click-through URL. Carries the ticket plus\n`__authn_status=sign_up` (or `sign_in` when the email is\nalready attached to a `User`) and the org id, so the SDK\nknows which flow to start.\n\nReturned for `pending` invitations only. `null` once the\ninvitation is `revoked` / `accepted` / `expired` since the\nticket can no longer be exchanged.\n",
             "examples": [
               "https://acme.authn.sh/v1/client/handshake?__authn_ticket=tkt_01HKX9SY9V7H7TF8C8K7J9X4ZG&__authn_status=sign_up&__authn_organization_id=org_01HKX9SY9V7H7TF8C8K7J9X4ZH&redirect_url=https%3A%2F%2Fapp.acme.com%2Fwelcome"
             ]
