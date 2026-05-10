@@ -24,6 +24,9 @@ final class VerifiedClaims
         public readonly bool $wasTest,
         public readonly array $raw,
         public readonly ?Organization $organization = null,
+        public readonly bool $twoFactorVerified = false,
+        public readonly ?int $secondFactorAgeSeconds = null,
+        public readonly ?int $firstFactorAgeSeconds = null,
     ) {}
 
     public function hasRole(string $key): bool

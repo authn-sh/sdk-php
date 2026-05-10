@@ -260,6 +260,8 @@ final class TokenVerifier
         $org = isset($claims['org']) && is_array($claims['org']) ? $this->normalizeOrg($claims['org']) : null;
         $organization = $org !== null ? $this->buildOrganization($org) : null;
 
+        [$firstFactorAgeSeconds, $secondFactorAgeSeconds, $twoFactorVerified] = $this->parseFva($claims);
+
         return new VerifiedClaims(
             sub: $sub,
             sid: $sid,
@@ -273,6 +275,9 @@ final class TokenVerifier
             wasTest: isset($claims['was_test']) && $claims['was_test'] === true,
             raw: $claims,
             organization: $organization,
+            twoFactorVerified: $twoFactorVerified,
+            secondFactorAgeSeconds: $secondFactorAgeSeconds,
+            firstFactorAgeSeconds: $firstFactorAgeSeconds,
         );
     }
 
@@ -337,6 +342,32 @@ final class TokenVerifier
             role: $org['rol'] ?? null,
             permissions: $permissions,
         );
+    }
+
+    /**
+     * Parses the `fva` ([first-factor-age, second-factor-age]) claim.
+     *
+     * Returns [firstFactorAgeSeconds, secondFactorAgeSeconds, twoFactorVerified].
+     * -1 in the JWT means "not verified" → null. twoFactorVerified = fva[1] !== -1.
+     *
+     * @param  array<string, mixed>  $claims
+     * @return array{?int, ?int, bool}
+     */
+    private function parseFva(array $claims): array
+    {
+        if (! isset($claims['fva']) || ! is_array($claims['fva'])) {
+            return [null, null, false];
+        }
+
+        $fva = array_values($claims['fva']);
+        $first = isset($fva[0]) && is_int($fva[0]) ? $fva[0] : null;
+        $second = isset($fva[1]) && is_int($fva[1]) ? $fva[1] : null;
+
+        return [
+            $first !== null && $first !== -1 ? $first : null,
+            $second !== null && $second !== -1 ? $second : null,
+            $second !== null && $second !== -1,
+        ];
     }
 
     private function cacheKey(): string

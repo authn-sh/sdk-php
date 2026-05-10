@@ -241,3 +241,56 @@ it('permissions array is deduped while preserving order', function (): void {
 
     expect($verified->organization?->permissions)->toBe(['perm:a', 'perm:b', 'perm:c']);
 });
+
+it('surfaces fva second-factor age and twoFactorVerified when second factor is present', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $claims = validClaims();
+    $claims['fva'] = [30, 120];
+
+    $verified = $verifier->verify($fixture->sign($claims));
+
+    expect($verified->twoFactorVerified)->toBeTrue();
+    expect($verified->firstFactorAgeSeconds)->toBe(30);
+    expect($verified->secondFactorAgeSeconds)->toBe(120);
+});
+
+it('surfaces fva with second-factor age of -1 as twoFactorVerified=false and null age', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $claims = validClaims();
+    $claims['fva'] = [45, -1];
+
+    $verified = $verifier->verify($fixture->sign($claims));
+
+    expect($verified->twoFactorVerified)->toBeFalse();
+    expect($verified->firstFactorAgeSeconds)->toBe(45);
+    expect($verified->secondFactorAgeSeconds)->toBeNull();
+});
+
+it('defaults fva fields to false/null when fva claim is absent', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $verified = $verifier->verify($fixture->sign(validClaims()));
+
+    expect($verified->twoFactorVerified)->toBeFalse();
+    expect($verified->firstFactorAgeSeconds)->toBeNull();
+    expect($verified->secondFactorAgeSeconds)->toBeNull();
+});
+
+it('maps first-factor-age of -1 to null firstFactorAgeSeconds', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $claims = validClaims();
+    $claims['fva'] = [-1, -1];
+
+    $verified = $verifier->verify($fixture->sign($claims));
+
+    expect($verified->twoFactorVerified)->toBeFalse();
+    expect($verified->firstFactorAgeSeconds)->toBeNull();
+    expect($verified->secondFactorAgeSeconds)->toBeNull();
+});
