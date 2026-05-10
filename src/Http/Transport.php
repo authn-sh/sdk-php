@@ -63,6 +63,27 @@ final class Transport
      */
     public function send(string $method, string $path, array $options = []): array
     {
+        $payload = $this->sendAny($method, $path, $options);
+        if (array_is_list($payload)) {
+            return [];
+        }
+
+        /** @var array<string, mixed> $payload */
+        return $payload;
+    }
+
+    /**
+     * Same as {@see send} but tolerates top-level JSON arrays in the response
+     * (e.g. `GET /v1/sms-templates` returns `[SmsTemplate, …]`).
+     *
+     * @param  Options  $options
+     * @return array<int|string, mixed>
+     *
+     * @throws ApiException
+     * @throws NetworkException
+     */
+    public function sendAny(string $method, string $path, array $options = []): array
+    {
         $method = strtoupper($method);
         $uri = $this->buildUri($path, $options['query'] ?? []);
 
@@ -129,7 +150,7 @@ final class Transport
             return [];
         }
 
-        return Json::decode((string) $response->getBody());
+        return Json::decodeAny((string) $response->getBody());
     }
 
     /**

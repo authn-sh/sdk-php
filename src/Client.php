@@ -15,6 +15,7 @@ use Authn\Sdk\Resources\PermissionsManager;
 use Authn\Sdk\Resources\RedirectUrlsManager;
 use Authn\Sdk\Resources\RolesManager;
 use Authn\Sdk\Resources\SessionsManager;
+use Authn\Sdk\Resources\SmsTemplatesManager;
 use Authn\Sdk\Resources\UsersManager;
 use Authn\Sdk\Resources\WebhookEndpointsManager;
 use Psr\Http\Client\ClientInterface;
@@ -110,5 +111,10 @@ final class Client
     public function oauthProviders(): OauthProvidersManager
     {
         return new OauthProvidersManager($this->transport);
+    }
+
+    public function smsTemplates(): SmsTemplatesManager
+    {
+        return new SmsTemplatesManager($this->transport);
     }
 }
