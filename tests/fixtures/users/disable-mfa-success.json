@@ -1,0 +1,49 @@
+{
+  "id": "user_01HKX9SY9V7H7TF8C8K7J9X4ZB",
+  "object": "user",
+  "external_id": null,
+  "username": null,
+  "first_name": "Jane",
+  "last_name": "Doe",
+  "image_url": null,
+  "has_image": false,
+  "primary_email_address_id": "idn_01HKX9SY9V7H7TF8C8K7J9X4ZC",
+  "primary_phone_number_id": null,
+  "primary_web3_wallet_id": null,
+  "password_enabled": true,
+  "two_factor_enabled": false,
+  "totp_enabled": false,
+  "backup_code_enabled": false,
+  "banned": false,
+  "locked": false,
+  "lockout_expires_in_seconds": null,
+  "verification_attempts_remaining": 100,
+  "created_at": 1714896900000,
+  "updated_at": 1714897200000,
+  "last_sign_in_at": null,
+  "mfa_enabled_at": null,
+  "mfa_disabled_at": 1714897200000,
+  "delete_self_enabled": true,
+  "create_organization_enabled": true,
+  "email_addresses": [
+    {
+      "id": "idn_01HKX9SY9V7H7TF8C8K7J9X4ZC",
+      "object": "email_address",
+      "email_address": "jane@example.com",
+      "reserved": false,
+      "verification": {
+        "status": "verified",
+        "strategy": "email_link"
+      },
+      "linked_to": []
+    }
+  ],
+  "phone_numbers": [],
+  "web3_wallets": [],
+  "external_accounts": [],
+  "enterprise_accounts": [],
+  "passkeys": [],
+  "public_metadata": {},
+  "private_metadata": {},
+  "unsafe_metadata": {}
+}

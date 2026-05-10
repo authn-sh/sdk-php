@@ -186,4 +186,26 @@ final class UsersManager extends Manager
             '/v1/users/' . rawurlencode($userId) . '/oauth-access-tokens/' . rawurlencode($provider),
         );
     }
+
+    public function verifyTotp(string $userId, string $code): TotpVerificationResult
+    {
+        $payload = $this->transport->send(
+            'POST',
+            '/v1/users/' . rawurlencode($userId) . '/verify-totp',
+            ['body' => ['code' => $code]],
+        );
+
+        return TotpVerificationResult::fromPayload($payload);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function disableMfa(string $userId): array
+    {
+        return $this->transport->send(
+            'DELETE',
+            '/v1/users/' . rawurlencode($userId) . '/mfa',
+        );
+    }
 }
