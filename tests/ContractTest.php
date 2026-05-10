@@ -86,6 +86,12 @@ it('declares operations for every BAPI endpoint the SDK calls', function (): voi
         ['GET', '/v1/permissions'],
         ['POST', '/v1/users/{user_id}/verify-totp'],
         ['DELETE', '/v1/users/{user_id}/mfa'],
+        ['GET', '/v1/oauth-providers'],
+        ['POST', '/v1/oauth-providers'],
+        ['GET', '/v1/oauth-providers/{oauth_provider_id}'],
+        ['PATCH', '/v1/oauth-providers/{oauth_provider_id}'],
+        ['DELETE', '/v1/oauth-providers/{oauth_provider_id}'],
+        ['POST', '/v1/oauth-providers/{oauth_provider_id}/test'],
     ];
 
     $missing = [];
