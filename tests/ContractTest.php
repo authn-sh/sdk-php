@@ -92,6 +92,10 @@ it('declares operations for every BAPI endpoint the SDK calls', function (): voi
         ['PATCH', '/v1/oauth-providers/{oauth_provider_id}'],
         ['DELETE', '/v1/oauth-providers/{oauth_provider_id}'],
         ['POST', '/v1/oauth-providers/{oauth_provider_id}/test'],
+        ['GET', '/v1/sms-templates'],
+        ['GET', '/v1/sms-templates/{sms_template_slug}'],
+        ['PATCH', '/v1/sms-templates/{sms_template_slug}'],
+        ['POST', '/v1/sms-templates/{sms_template_slug}/revert'],
     ];
 
     $missing = [];
