@@ -84,6 +84,8 @@ it('declares operations for every BAPI endpoint the SDK calls', function (): voi
         ['DELETE', '/v1/roles/{role_id}'],
         ['PUT', '/v1/roles/{role_id}/permissions'],
         ['GET', '/v1/permissions'],
+        ['POST', '/v1/users/{user_id}/verify-totp'],
+        ['DELETE', '/v1/users/{user_id}/mfa'],
     ];
 
     $missing = [];

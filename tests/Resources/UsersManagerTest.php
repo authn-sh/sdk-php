@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use Authn\Sdk\Client;
+use Authn\Sdk\Http\ApiException;
 use Authn\Sdk\Http\ResourceNotFoundException;
 use Authn\Sdk\Resources\PaginatedList;
+use Authn\Sdk\Resources\TotpVerificationResult;
 use Authn\Sdk\Resources\UsersListParams;
 use Authn\Sdk\Resources\UsersManager;
 use Authn\Sdk\Tests\Support\MockTransport;
@@ -194,4 +196,63 @@ it('updateMetadata sends a PATCH to /metadata', function (): void {
     expect($request->getMethod())->toBe('PATCH');
     expect((string) $request->getUri())->toEndWith('/v1/users/user_1/metadata');
     expect((string) $request->getBody())->toBe('{"public_metadata":{"plan":"pro"}}');
+});
+
+it('verifyTotp returns TotpVerificationResult with verified=true on success', function (): void {
+    $fixture = (array) json_decode(
+        (string) file_get_contents(__DIR__ . '/../fixtures/users/verify-totp-success.json'),
+        true,
+        flags: JSON_THROW_ON_ERROR,
+    );
+    $mock = (new MockTransport)->enqueue(body: $fixture);
+    $m = new UsersManager($mock->transport());
+
+    $result = $m->verifyTotp('user_1', '542178');
+
+    expect($result)->toBeInstanceOf(TotpVerificationResult::class);
+    expect($result->verified)->toBeTrue();
+    $request = $mock->lastRequest();
+    expect($request->getMethod())->toBe('POST');
+    expect((string) $request->getUri())->toEndWith('/v1/users/user_1/verify-totp');
+    expect((string) $request->getBody())->toBe('{"code":"542178"}');
+});
+
+it('verifyTotp returns TotpVerificationResult with verified=false on incorrect code', function (): void {
+    $fixture = (array) json_decode(
+        (string) file_get_contents(__DIR__ . '/../fixtures/users/verify-totp-incorrect.json'),
+        true,
+        flags: JSON_THROW_ON_ERROR,
+    );
+    $mock = (new MockTransport)->enqueue(body: $fixture);
+    $m = new UsersManager($mock->transport());
+
+    $result = $m->verifyTotp('user_1', '000000');
+
+    expect($result->verified)->toBeFalse();
+});
+
+it('verifyTotp rethrows ApiException on 4xx error responses', function (): void {
+    $mock = (new MockTransport)->enqueue(422, ['errors' => [['code' => 'mfa_not_enabled', 'message' => 'MFA is not enabled']]]);
+    $m = new UsersManager($mock->transport());
+
+    expect(fn () => $m->verifyTotp('user_1', '000000'))->toThrow(ApiException::class);
+});
+
+it('disableMfa sends DELETE to /mfa and returns the updated user', function (): void {
+    $fixture = (array) json_decode(
+        (string) file_get_contents(__DIR__ . '/../fixtures/users/disable-mfa-success.json'),
+        true,
+        flags: JSON_THROW_ON_ERROR,
+    );
+    $mock = (new MockTransport)->enqueue(body: $fixture);
+    $m = new UsersManager($mock->transport());
+
+    $user = $m->disableMfa('user_1');
+
+    expect($user['two_factor_enabled'])->toBeFalse();
+    expect($user['totp_enabled'])->toBeFalse();
+    expect($user['backup_code_enabled'])->toBeFalse();
+    $request = $mock->lastRequest();
+    expect($request->getMethod())->toBe('DELETE');
+    expect((string) $request->getUri())->toEndWith('/v1/users/user_1/mfa');
 });
