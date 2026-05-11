@@ -35,6 +35,8 @@ final class VerifiedClaims
         public readonly ?int $firstFactorAgeSeconds = null,
         public readonly bool $phoneNumberVerified = false,
         public readonly ?string $defaultSecondFactor = null,
+        public readonly bool $passkeyVerified = false,
+        public readonly int $passkeyCount = 0,
     ) {}
 
     public function hasRole(string $key): bool
@@ -55,5 +57,15 @@ final class VerifiedClaims
     public function preferredSecondFactor(): ?string
     {
         return $this->defaultSecondFactor;
+    }
+
+    public function wasVerifiedByPasskey(): bool
+    {
+        return $this->passkeyVerified;
+    }
+
+    public function hasPasskey(): bool
+    {
+        return $this->passkeyCount > 0;
     }
 }

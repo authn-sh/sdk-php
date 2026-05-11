@@ -364,3 +364,81 @@ it('rejects unknown dsf values as null defaultSecondFactor', function (): void {
 
     expect($verified->defaultSecondFactor)->toBeNull();
 });
+
+it('surfaces passkeyVerified=true when pkv claim is true', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $claims = validClaims();
+    $claims['pkv'] = true;
+    $claims['pkc'] = 2;
+
+    $verified = $verifier->verify($fixture->sign($claims));
+
+    expect($verified->passkeyVerified)->toBeTrue();
+    expect($verified->wasVerifiedByPasskey())->toBeTrue();
+    expect($verified->passkeyCount)->toBe(2);
+    expect($verified->hasPasskey())->toBeTrue();
+});
+
+it('defaults passkey claims when pkv and pkc are absent (non-passkey session)', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $verified = $verifier->verify($fixture->sign(validClaims()));
+
+    expect($verified->passkeyVerified)->toBeFalse();
+    expect($verified->wasVerifiedByPasskey())->toBeFalse();
+    expect($verified->passkeyCount)->toBe(0);
+    expect($verified->hasPasskey())->toBeFalse();
+});
+
+it('treats pkv: false as passkeyVerified=false', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $claims = validClaims();
+    $claims['pkv'] = false;
+    $claims['pkc'] = 0;
+
+    $verified = $verifier->verify($fixture->sign($claims));
+
+    expect($verified->passkeyVerified)->toBeFalse();
+    expect($verified->passkeyCount)->toBe(0);
+    expect($verified->hasPasskey())->toBeFalse();
+});
+
+it('exposes both passkeyVerified and twoFactorVerified for passkey + TOTP step-up sessions', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $claims = validClaims();
+    $claims['pkv'] = true;
+    $claims['pkc'] = 1;
+    $claims['fva'] = [30, 120];
+
+    $verified = $verifier->verify($fixture->sign($claims));
+
+    expect($verified->passkeyVerified)->toBeTrue();
+    expect($verified->twoFactorVerified)->toBeTrue();
+    expect($verified->firstFactorAgeSeconds)->toBe(30);
+    expect($verified->secondFactorAgeSeconds)->toBe(120);
+});
+
+it('ignores non-integer and negative pkc values, defaulting passkeyCount to 0', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $claims = validClaims();
+    $claims['pkc'] = '3';
+
+    $verified = $verifier->verify($fixture->sign($claims));
+
+    expect($verified->passkeyCount)->toBe(0);
+
+    $claims2 = validClaims();
+    $claims2['pkc'] = -1;
+    $verified2 = $verifier->verify($fixture->sign($claims2));
+
+    expect($verified2->passkeyCount)->toBe(0);
+});
