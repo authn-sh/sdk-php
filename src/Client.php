@@ -12,6 +12,7 @@ use Authn\Sdk\Resources\InstanceManager;
 use Authn\Sdk\Resources\InvitationsManager;
 use Authn\Sdk\Resources\OauthProvidersManager;
 use Authn\Sdk\Resources\OrganizationsManager;
+use Authn\Sdk\Resources\PasskeysManager;
 use Authn\Sdk\Resources\PermissionsManager;
 use Authn\Sdk\Resources\PhoneNumbersManager;
 use Authn\Sdk\Resources\RedirectUrlsManager;
@@ -128,5 +129,10 @@ final class Client
     public function externalAccounts(): ExternalAccountsManager
     {
         return new ExternalAccountsManager($this->transport);
+    }
+
+    public function passkeys(): PasskeysManager
+    {
+        return new PasskeysManager($this->transport);
     }
 }
