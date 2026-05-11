@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `PasskeysManager` — BAPI binding for `/v1/passkeys` (`list`, `get`, `update(id, nickname)`, `delete`) plus the `Passkey` DTO and `PasskeysListParams` (with `user_id` filter). Accessible via `$client->passkeys()`. Enrollment is FAPI-only (browser ceremony) and is not surfaced here.
+
 ## [0.4.0] — 2026-05-11
 
 ### Added
