@@ -6,10 +6,12 @@ namespace Authn\Sdk;
 
 use Authn\Sdk\Http\Transport;
 use Authn\Sdk\Resources\AllowlistIdentifiersManager;
+use Authn\Sdk\Resources\AppearanceManager;
 use Authn\Sdk\Resources\BlocklistIdentifiersManager;
 use Authn\Sdk\Resources\ExternalAccountsManager;
 use Authn\Sdk\Resources\InstanceManager;
 use Authn\Sdk\Resources\InvitationsManager;
+use Authn\Sdk\Resources\LocalizationManager;
 use Authn\Sdk\Resources\OauthProvidersManager;
 use Authn\Sdk\Resources\OrganizationsManager;
 use Authn\Sdk\Resources\PasskeysManager;
@@ -134,5 +136,15 @@ final class Client
     public function passkeys(): PasskeysManager
     {
         return new PasskeysManager($this->transport);
+    }
+
+    public function appearance(): AppearanceManager
+    {
+        return new AppearanceManager($this->transport);
+    }
+
+    public function localization(): LocalizationManager
+    {
+        return new LocalizationManager($this->transport);
     }
 }

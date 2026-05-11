@@ -5,6 +5,8 @@
 ### Added
 
 - `PasskeysManager` — BAPI binding for `/v1/passkeys` (`list`, `get`, `update(id, nickname)`, `delete`) plus the `Passkey` DTO and `PasskeysListParams` (with `user_id` filter). Accessible via `$client->passkeys()`. Enrollment is FAPI-only (browser ceremony) and is not surfaced here.
+- `AppearanceManager` — BAPI binding for `/v1/instance/appearance` (`get`, `put`, `patch`) plus the `Appearance` DTO (`variables`, `elements`, `layout`). Accessible via `$client->appearance()`. `patch()` accepts a sparse array; the server deep-merges supplied keys.
+- `LocalizationManager` — BAPI binding for `/v1/instance/localization` (`get`, `put`, `patch`) plus the `Localization` DTO (`default_locale`, `fallback_locale`, `supported_locales[]`, `overrides`). Accessible via `$client->localization()`. `patch()` supports the sparse per-key override merge: passing `null` for a key under `overrides[locale]` removes that single override.
 
 ## [0.4.0] — 2026-05-11
 

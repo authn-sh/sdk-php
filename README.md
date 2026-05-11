@@ -34,7 +34,7 @@ $session = $client->sessions()->revoke('sess_…');
 $invite = $client->invitations()->create(['email_address' => 'a@b.com']);
 ```
 
-Resource managers: `users()`, `sessions()`, `invitations()`, `allowlistIdentifiers()`, `blocklistIdentifiers()`, `redirectUrls()`, `instance()`, `webhookEndpoints()`, `organizations()`, `roles()`, `permissions()`, `oauthProviders()`, `smsTemplates()`, `phoneNumbers()`, `externalAccounts()`, `passkeys()`.
+Resource managers: `users()`, `sessions()`, `invitations()`, `allowlistIdentifiers()`, `blocklistIdentifiers()`, `redirectUrls()`, `instance()`, `webhookEndpoints()`, `organizations()`, `roles()`, `permissions()`, `oauthProviders()`, `smsTemplates()`, `phoneNumbers()`, `externalAccounts()`, `passkeys()`, `appearance()`, `localization()`.
 
 Organization sub-managers are accessed via `$client->organizations()`:
 
