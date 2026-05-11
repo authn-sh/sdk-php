@@ -7,11 +7,13 @@ namespace Authn\Sdk;
 use Authn\Sdk\Http\Transport;
 use Authn\Sdk\Resources\AllowlistIdentifiersManager;
 use Authn\Sdk\Resources\BlocklistIdentifiersManager;
+use Authn\Sdk\Resources\ExternalAccountsManager;
 use Authn\Sdk\Resources\InstanceManager;
 use Authn\Sdk\Resources\InvitationsManager;
 use Authn\Sdk\Resources\OauthProvidersManager;
 use Authn\Sdk\Resources\OrganizationsManager;
 use Authn\Sdk\Resources\PermissionsManager;
+use Authn\Sdk\Resources\PhoneNumbersManager;
 use Authn\Sdk\Resources\RedirectUrlsManager;
 use Authn\Sdk\Resources\RolesManager;
 use Authn\Sdk\Resources\SessionsManager;
@@ -116,5 +118,15 @@ final class Client
     public function smsTemplates(): SmsTemplatesManager
     {
         return new SmsTemplatesManager($this->transport);
+    }
+
+    public function phoneNumbers(): PhoneNumbersManager
+    {
+        return new PhoneNumbersManager($this->transport);
+    }
+
+    public function externalAccounts(): ExternalAccountsManager
+    {
+        return new ExternalAccountsManager($this->transport);
     }
 }
