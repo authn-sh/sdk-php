@@ -156,6 +156,24 @@ $claims->hasRole('org:admin');
 $claims->hasPermission(SystemPermissions::ORG_SYS_PROFILE_MANAGE);
 ```
 
+### Passkey claims
+
+`$claims->passkeyVerified` is `true` when the current session was authenticated by a passkey first-factor with `userVerification = required` (parsed from the `pkv` JWT claim). `$claims->passkeyCount` is the snapshot of the user's verified-passkey count at session creation (`pkc` claim).
+
+```php
+$claims = $verifier->verify($jwt);
+
+// Gate sensitive operations to passkey-authenticated sessions.
+if (! $claims->wasVerifiedByPasskey()) {
+    abort(403, 'Sensitive operation requires a passkey session.');
+}
+
+// Nudge a user who has zero passkeys towards enrollment.
+if (! $claims->hasPasskey()) {
+    // render passkey-enrollment CTA
+}
+```
+
 ## Verify a webhook
 
 ```php

@@ -265,6 +265,11 @@ final class TokenVerifier
         $phoneNumberVerified = isset($claims['pnv']) && $claims['pnv'] === true;
         $defaultSecondFactor = $this->parseDefaultSecondFactor($claims);
 
+        $passkeyVerified = isset($claims['pkv']) && $claims['pkv'] === true;
+        $passkeyCount = isset($claims['pkc']) && is_int($claims['pkc']) && $claims['pkc'] >= 0
+            ? $claims['pkc']
+            : 0;
+
         return new VerifiedClaims(
             sub: $sub,
             sid: $sid,
@@ -283,6 +288,8 @@ final class TokenVerifier
             firstFactorAgeSeconds: $firstFactorAgeSeconds,
             phoneNumberVerified: $phoneNumberVerified,
             defaultSecondFactor: $defaultSecondFactor,
+            passkeyVerified: $passkeyVerified,
+            passkeyCount: $passkeyCount,
         );
     }
 
