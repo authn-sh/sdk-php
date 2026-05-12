@@ -13,7 +13,9 @@ use Authn\Sdk\Resources\EnterpriseConnectionsManager;
 use Authn\Sdk\Resources\ExternalAccountsManager;
 use Authn\Sdk\Resources\InstanceManager;
 use Authn\Sdk\Resources\InvitationsManager;
+use Authn\Sdk\Resources\JwtTemplatesManager;
 use Authn\Sdk\Resources\LocalizationManager;
+use Authn\Sdk\Resources\OauthApplicationsManager;
 use Authn\Sdk\Resources\OauthProvidersManager;
 use Authn\Sdk\Resources\OrganizationsManager;
 use Authn\Sdk\Resources\PasskeysManager;
@@ -158,5 +160,15 @@ final class Client
     public function localization(): LocalizationManager
     {
         return new LocalizationManager($this->transport);
+    }
+
+    public function jwtTemplates(): JwtTemplatesManager
+    {
+        return new JwtTemplatesManager($this->transport);
+    }
+
+    public function oauthApplications(): OauthApplicationsManager
+    {
+        return new OauthApplicationsManager($this->transport);
     }
 }
