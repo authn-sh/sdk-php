@@ -518,3 +518,86 @@ it('preserves entcon and entacc across impersonation (actor) sessions', function
     expect($verified->enterpriseConnectionId)->toBe('entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA');
     expect($verified->enterpriseAccountId)->toBe('entacc_01HKX9SY9V7H7TF8C8K7J9X4ZB');
 });
+
+it('surfaces custom-template claims as customClaims', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $claims = validClaims();
+    $claims['email'] = 'jane@acme.example';
+    $claims['role'] = 'authenticated';
+    $claims['org_slug'] = 'acme';
+    $claims['tier'] = 'pro';
+    $claims['metadata'] = ['plan' => 'team', 'seats' => 25];
+
+    $verified = $verifier->verify($fixture->sign($claims));
+
+    expect($verified->customClaims)->toBe([
+        'email' => 'jane@acme.example',
+        'role' => 'authenticated',
+        'org_slug' => 'acme',
+        'tier' => 'pro',
+        'metadata' => ['plan' => 'team', 'seats' => 25],
+    ]);
+    expect($verified->customClaim('tier'))->toBe('pro');
+    expect($verified->customClaim('metadata'))->toBe(['plan' => 'team', 'seats' => 25]);
+});
+
+it('excludes every reserved claim from customClaims', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $claims = validClaims();
+    $claims['org'] = ['id' => 'org_1', 'slg' => 'acme'];
+    $claims['fva'] = [10, 20];
+    $claims['pnv'] = true;
+    $claims['dsf'] = 'totp';
+    $claims['pkv'] = true;
+    $claims['pkc'] = 1;
+    $claims['entcon'] = 'entcon_x';
+    $claims['entacc'] = 'entacc_y';
+    $claims['act'] = ['iss' => $claims['iss'], 'sub' => 'user_admin', 'sid' => 'sess_admin'];
+    $claims['jti'] = 'jti-1';
+    $claims['aud'] = 'api-gateway';
+    $claims['nonce'] = 'n-1';
+
+    $verified = $verifier->verify($fixture->sign($claims));
+
+    expect($verified->customClaims)->toBe([]);
+});
+
+it('defaults customClaims to an empty array when only reserved claims are present', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $verified = $verifier->verify($fixture->sign(validClaims()));
+
+    expect($verified->customClaims)->toBe([]);
+});
+
+it('customClaim returns the supplied default when the key is missing', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $claims = validClaims();
+    $claims['tier'] = 'pro';
+
+    $verified = $verifier->verify($fixture->sign($claims));
+
+    expect($verified->customClaim('tier', 'free'))->toBe('pro');
+    expect($verified->customClaim('plan', 'starter'))->toBe('starter');
+    expect($verified->customClaim('missing'))->toBeNull();
+});
+
+it('preserves a null value stored in customClaims', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $claims = validClaims();
+    $claims['feature_flag'] = null;
+
+    $verified = $verifier->verify($fixture->sign($claims));
+
+    expect($verified->customClaims)->toHaveKey('feature_flag');
+    expect($verified->customClaim('feature_flag', 'fallback'))->toBeNull();
+});

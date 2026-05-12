@@ -277,6 +277,13 @@ final class TokenVerifier
             ? $claims['entacc']
             : null;
 
+        $customClaims = [];
+        foreach ($claims as $key => $value) {
+            if (is_string($key) && ! in_array($key, VerifiedClaims::RESERVED_CLAIMS, true)) {
+                $customClaims[$key] = $value;
+            }
+        }
+
         return new VerifiedClaims(
             sub: $sub,
             sid: $sid,
@@ -299,6 +306,7 @@ final class TokenVerifier
             passkeyCount: $passkeyCount,
             enterpriseConnectionId: $enterpriseConnectionId,
             enterpriseAccountId: $enterpriseAccountId,
+            customClaims: $customClaims,
         );
     }
 

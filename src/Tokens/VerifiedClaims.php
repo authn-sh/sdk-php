@@ -13,9 +13,20 @@ final class VerifiedClaims
     public const SECOND_FACTOR_BACKUP_CODE = 'backup_code';
 
     /**
+     * Reserved JWT registered claims plus the authn.sh-emitted claim names.
+     * Anything not in this set is surfaced through {@see VerifiedClaims::$customClaims}.
+     */
+    public const RESERVED_CLAIMS = [
+        'iss', 'sub', 'aud', 'exp', 'nbf', 'iat', 'jti', 'nonce',
+        'sid', 'azp', 'act', 'org', 'was_test',
+        'fva', 'pnv', 'dsf', 'pkv', 'pkc', 'entcon', 'entacc',
+    ];
+
+    /**
      * @param  array{iss: string, sub: string, sid: string}|null  $actor  impersonation chain
      * @param  array{id: string, slg?: string, rol?: string, per?: array<int, string>}|null  $org  deprecated: use $organization
      * @param  array<string, mixed>  $raw
+     * @param  array<string, mixed>  $customClaims  non-reserved claims rendered by a JwtTemplate
      */
     public function __construct(
         public readonly string $sub,
@@ -39,7 +50,13 @@ final class VerifiedClaims
         public readonly int $passkeyCount = 0,
         public readonly ?string $enterpriseConnectionId = null,
         public readonly ?string $enterpriseAccountId = null,
+        public readonly array $customClaims = [],
     ) {}
+
+    public function customClaim(string $key, mixed $default = null): mixed
+    {
+        return array_key_exists($key, $this->customClaims) ? $this->customClaims[$key] : $default;
+    }
 
     public function hasRole(string $key): bool
     {
