@@ -6274,6 +6274,130 @@
         }
       }
     },
+    "/v1/enterprise-accounts": {
+      "get": {
+        "operationId": "listEnterpriseAccounts",
+        "summary": "List enterprise accounts",
+        "description": "Every `EnterpriseAccount` row in the environment. Filterable by\n`user_id` and `enterprise_connection_id` so admins can scope to a\nsingle user or audit which users have signed in via a specific\nenterprise connection.\n\nNo `POST` / `PATCH` on this resource — enterprise accounts are\nprovisioned through the SSO callback (`/v1/saml/{id}/acs` or\n`/v1/enterprise-sso-callback`), not via BAPI.\n",
+        "tags": [
+          "Enterprise Connections"
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "description": "Filter to enterprise accounts owned by this user.",
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "name": "enterprise_connection_id",
+            "in": "query",
+            "required": false,
+            "description": "Filter to enterprise accounts created via this connection.",
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/LimitParam"
+          },
+          {
+            "$ref": "#/components/parameters/OffsetParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of enterprise accounts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "total_count"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EnterpriseAccount"
+                      }
+                    },
+                    "total_count": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/enterprise-accounts/{enterprise_account_id}": {
+      "parameters": [
+        {
+          "name": "enterprise_account_id",
+          "in": "path",
+          "required": true,
+          "description": "ID of the enterprise account.",
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getEnterpriseAccount",
+        "summary": "Get an enterprise account",
+        "description": "Fetch a single `EnterpriseAccount` by ID.",
+        "tags": [
+          "Enterprise Connections"
+        ],
+        "responses": {
+          "200": {
+            "description": "The enterprise account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnterpriseAccount"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteEnterpriseAccount",
+        "summary": "Delete an enterprise account",
+        "description": "Admin unlink — drops the local `EnterpriseAccount` row. The\nunderlying `User` row is preserved; the next sign-in via the same\n`EnterpriseConnection` will mint a fresh `EnterpriseAccount` if\nthe connection's policy allows JIT provisioning, or fail with\n`enterprise_sso_no_user` if it doesn't.\n",
+        "tags": [
+          "Enterprise Connections"
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
     "/v1/sms-templates": {
       "get": {
         "operationId": "listSmsTemplates",
