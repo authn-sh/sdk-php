@@ -68,4 +68,14 @@ final class OrganizationsManager extends Manager
     {
         return new OrganizationDomainsManager($this->transport, $orgId);
     }
+
+    public function scimTokens(string $orgId): ScimTokensManager
+    {
+        return new ScimTokensManager($this->transport, $orgId);
+    }
+
+    public function scimAttributeMappings(string $orgId): ScimAttributeMappingsManager
+    {
+        return new ScimAttributeMappingsManager($this->transport, $orgId);
+    }
 }
