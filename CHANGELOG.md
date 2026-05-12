@@ -6,6 +6,9 @@
 
 - `ScimTokensManager` — BAPI binding for `/v1/organizations/{org_id}/scim/tokens` (`list`, `issue(name)`, `revoke(id)`) plus the `ScimToken` DTO (`id`, `organizationId`, `name`, `prefix`, `createdAt`, `revokedAt`) and `ScimTokenWithPlaintext` (issue-response only — carries the full `token` plaintext exactly once). Accessible via `$client->organizations()->scimTokens($orgId)`.
 - `ScimAttributeMappingsManager` — BAPI binding for `/v1/organizations/{org_id}/scim/attribute-mappings` (`get`, `put(mapping)`) and `/v1/organizations/{org_id}/scim/endpoint` (`endpoint()`). Plus the `ScimAttributeMapping` DTO. Accessible via `$client->organizations()->scimAttributeMappings($orgId)`. `put()` is a full-resource replace — unsupplied keys revert to server defaults.
+- `VerifiedClaims->customClaims: array<string, mixed>` — surfaces every non-reserved JWT claim parsed from a token. Reserved keys (`iss`, `sub`, `aud`, `exp`, `nbf`, `iat`, `jti`, `nonce`, `sid`, `azp`, `act`, `org`, `was_test`, `fva`, `pnv`, `dsf`, `pkv`, `pkc`, `entcon`, `entacc`) are excluded. Lets consumers reading custom-template-rendered tokens (`Session.getToken({template})`) access their template-defined claims without re-parsing `raw`.
+- `VerifiedClaims::customClaim(string $key, mixed $default = null): mixed` — sugar accessor that returns `$default` when the key is missing, distinguishing absence from a legitimate `null` value (which is preserved verbatim).
+- `VerifiedClaims::RESERVED_CLAIMS` constant — the canonical list of reserved keys for callers that want to filter or introspect raw claim sets.
 
 ## [0.6.0] — 2026-05-12
 
