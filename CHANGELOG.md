@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- `ScimTokensManager` — BAPI binding for `/v1/organizations/{org_id}/scim/tokens` (`list`, `issue(name)`, `revoke(id)`) plus the `ScimToken` DTO (`id`, `organizationId`, `name`, `prefix`, `createdAt`, `revokedAt`) and `ScimTokenWithPlaintext` (issue-response only — carries the full `token` plaintext exactly once). Accessible via `$client->organizations()->scimTokens($orgId)`.
+- `ScimAttributeMappingsManager` — BAPI binding for `/v1/organizations/{org_id}/scim/attribute-mappings` (`get`, `put(mapping)`) and `/v1/organizations/{org_id}/scim/endpoint` (`endpoint()`). Plus the `ScimAttributeMapping` DTO. Accessible via `$client->organizations()->scimAttributeMappings($orgId)`. `put()` is a full-resource replace — unsupplied keys revert to server defaults.
+
 ## [0.6.0] — 2026-05-12
 
 ### Added
