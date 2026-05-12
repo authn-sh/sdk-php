@@ -270,6 +270,13 @@ final class TokenVerifier
             ? $claims['pkc']
             : 0;
 
+        $enterpriseConnectionId = isset($claims['entcon']) && is_string($claims['entcon']) && $claims['entcon'] !== ''
+            ? $claims['entcon']
+            : null;
+        $enterpriseAccountId = isset($claims['entacc']) && is_string($claims['entacc']) && $claims['entacc'] !== ''
+            ? $claims['entacc']
+            : null;
+
         return new VerifiedClaims(
             sub: $sub,
             sid: $sid,
@@ -290,6 +297,8 @@ final class TokenVerifier
             defaultSecondFactor: $defaultSecondFactor,
             passkeyVerified: $passkeyVerified,
             passkeyCount: $passkeyCount,
+            enterpriseConnectionId: $enterpriseConnectionId,
+            enterpriseAccountId: $enterpriseAccountId,
         );
     }
 

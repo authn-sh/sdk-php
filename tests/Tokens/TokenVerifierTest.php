@@ -442,3 +442,79 @@ it('ignores non-integer and negative pkc values, defaulting passkeyCount to 0', 
 
     expect($verified2->passkeyCount)->toBe(0);
 });
+
+it('surfaces enterprise SSO claims when entcon and entacc are present', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $claims = validClaims();
+    $claims['entcon'] = 'entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA';
+    $claims['entacc'] = 'entacc_01HKX9SY9V7H7TF8C8K7J9X4ZB';
+
+    $verified = $verifier->verify($fixture->sign($claims));
+
+    expect($verified->enterpriseConnectionId)->toBe('entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA');
+    expect($verified->enterpriseAccountId)->toBe('entacc_01HKX9SY9V7H7TF8C8K7J9X4ZB');
+    expect($verified->wasVerifiedByEnterpriseSso())->toBeTrue();
+});
+
+it('defaults entcon and entacc to null on a non-enterprise session', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $verified = $verifier->verify($fixture->sign(validClaims()));
+
+    expect($verified->enterpriseConnectionId)->toBeNull();
+    expect($verified->enterpriseAccountId)->toBeNull();
+    expect($verified->wasVerifiedByEnterpriseSso())->toBeFalse();
+});
+
+it('ignores non-string entcon and entacc values, defaulting to null', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $claims = validClaims();
+    $claims['entcon'] = 123;
+    $claims['entacc'] = ['nested' => 'value'];
+
+    $verified = $verifier->verify($fixture->sign($claims));
+
+    expect($verified->enterpriseConnectionId)->toBeNull();
+    expect($verified->enterpriseAccountId)->toBeNull();
+    expect($verified->wasVerifiedByEnterpriseSso())->toBeFalse();
+});
+
+it('treats empty-string entcon and entacc as absent', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $claims = validClaims();
+    $claims['entcon'] = '';
+    $claims['entacc'] = '';
+
+    $verified = $verifier->verify($fixture->sign($claims));
+
+    expect($verified->enterpriseConnectionId)->toBeNull();
+    expect($verified->enterpriseAccountId)->toBeNull();
+    expect($verified->wasVerifiedByEnterpriseSso())->toBeFalse();
+});
+
+it('preserves entcon and entacc across impersonation (actor) sessions', function (): void {
+    $fixture = new JwtFixture;
+    $verifier = makeVerifier(new StaticBodyClient($fixture->jwksJson()));
+
+    $claims = validClaims();
+    $claims['entcon'] = 'entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA';
+    $claims['entacc'] = 'entacc_01HKX9SY9V7H7TF8C8K7J9X4ZB';
+    $claims['act'] = [
+        'iss' => $claims['iss'],
+        'sub' => 'user_admin',
+        'sid' => 'sess_admin',
+    ];
+
+    $verified = $verifier->verify($fixture->sign($claims));
+
+    expect($verified->actor)->not->toBeNull();
+    expect($verified->enterpriseConnectionId)->toBe('entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA');
+    expect($verified->enterpriseAccountId)->toBe('entacc_01HKX9SY9V7H7TF8C8K7J9X4ZB');
+});
