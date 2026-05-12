@@ -36,6 +36,14 @@
       "description": "User-owned email identifiers and their verification state."
     },
     {
+      "name": "Phone Numbers",
+      "description": "User-owned phone identifiers, their verification state, and MFA-reserve flags."
+    },
+    {
+      "name": "External Accounts",
+      "description": "Per-user links to social-IdP `OauthProvider` connections."
+    },
+    {
       "name": "Sessions",
       "description": "Live authenticated sessions across devices (admin view)."
     },
@@ -86,6 +94,10 @@
     {
       "name": "OAuth Providers",
       "description": "Per-environment social-IdP configuration (`OauthProvider`)."
+    },
+    {
+      "name": "Enterprise Connections",
+      "description": "Per-environment enterprise-IdP configuration (`EnterpriseConnection`)."
     },
     {
       "name": "SMS Templates",
@@ -295,6 +307,7 @@
                           "external_accounts": [],
                           "enterprise_accounts": [],
                           "passkeys": [],
+                          "passkey_count": 0,
                           "password_enabled": true,
                           "two_factor_enabled": false,
                           "totp_enabled": false,
@@ -427,6 +440,7 @@
                       "external_accounts": [],
                       "enterprise_accounts": [],
                       "passkeys": [],
+                      "passkey_count": 0,
                       "password_enabled": true,
                       "two_factor_enabled": false,
                       "totp_enabled": false,
@@ -686,6 +700,7 @@
                       "external_accounts": [],
                       "enterprise_accounts": [],
                       "passkeys": [],
+                      "passkey_count": 0,
                       "password_enabled": true,
                       "two_factor_enabled": false,
                       "totp_enabled": false,
@@ -1565,6 +1580,369 @@
           },
           "422": {
             "$ref": "#/components/responses/UnprocessableEntity"
+          }
+        }
+      }
+    },
+    "/v1/phone-numbers": {
+      "get": {
+        "operationId": "listPhoneNumbers",
+        "summary": "List phone numbers",
+        "description": "Every `PhoneNumber` row in the environment. Filterable by `user_id`\nso admins can scope down to a single user's phones.\n",
+        "tags": [
+          "Phone Numbers"
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "description": "Filter to phone numbers belonging to this user.",
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/LimitParam"
+          },
+          {
+            "$ref": "#/components/parameters/OffsetParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of phone numbers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "total_count"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PhoneNumber"
+                      }
+                    },
+                    "total_count": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createPhoneNumber",
+        "summary": "Create a phone number",
+        "description": "Attach a new phone to a user. By default the row is unverified and\n`current_challenge_id` is `null`. Pass `verified: true` to mint it\nalready verified — the BAPI is privileged.\n",
+        "tags": [
+          "Phone Numbers"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/PhoneNumberCreateRequest"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "user_id"
+                    ],
+                    "properties": {
+                      "user_id": {
+                        "$ref": "#/components/schemas/Id"
+                      },
+                      "verified": {
+                        "type": "boolean",
+                        "description": "When `true`, the BAPI marks the row verified immediately. Default `false`."
+                      },
+                      "primary": {
+                        "type": "boolean",
+                        "description": "When `true`, promote the new row to the user's primary phone. Default `false`."
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new phone number.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneNumber"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          }
+        }
+      }
+    },
+    "/v1/phone-numbers/{phone_number_id}": {
+      "parameters": [
+        {
+          "name": "phone_number_id",
+          "in": "path",
+          "required": true,
+          "description": "ID of the phone number.",
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getPhoneNumber",
+        "summary": "Get a phone number",
+        "description": "Fetch a single `PhoneNumber` by ID.",
+        "tags": [
+          "Phone Numbers"
+        ],
+        "responses": {
+          "200": {
+            "description": "The phone number.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneNumber"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updatePhoneNumber",
+        "summary": "Update a phone number",
+        "description": "Mark the phone verified server-side, toggle MFA flags, or promote\nit to the user's primary phone. Sending an empty body is a no-op.\n",
+        "tags": [
+          "Phone Numbers"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "allOf": [
+                  {
+                    "$ref": "#/components/schemas/PhoneNumberUpdateRequest"
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "verified": {
+                        "type": "boolean",
+                        "description": "When `true`, marks the phone verified (BAPI privilege)."
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated phone number.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PhoneNumber"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deletePhoneNumber",
+        "summary": "Delete a phone number",
+        "description": "Hard-delete the phone number. Returns `409` with\n`phone_reserved_for_second_factor` when the row is currently\ncommitted to MFA — clear `reserved_for_second_factor` first.\n",
+        "tags": [
+          "Phone Numbers"
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/external-accounts": {
+      "get": {
+        "operationId": "listExternalAccounts",
+        "summary": "List external accounts",
+        "description": "Every `ExternalAccount` row in the environment. Filterable by\n`user_id` and `oauth_provider_id` so admins can scope to a single\nuser or audit which users are linked to a specific provider.\n",
+        "tags": [
+          "External Accounts"
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": false,
+            "description": "Filter to external accounts owned by this user.",
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "name": "oauth_provider_id",
+            "in": "query",
+            "required": false,
+            "description": "Filter to external accounts created via this provider.",
+            "schema": {
+              "$ref": "#/components/schemas/Id"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/LimitParam"
+          },
+          {
+            "$ref": "#/components/parameters/OffsetParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of external accounts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "total_count"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ExternalAccount"
+                      }
+                    },
+                    "total_count": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/v1/external-accounts/{external_account_id}": {
+      "parameters": [
+        {
+          "name": "external_account_id",
+          "in": "path",
+          "required": true,
+          "description": "ID of the external account.",
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getExternalAccount",
+        "summary": "Get an external account",
+        "description": "Fetch a single `ExternalAccount` by ID.",
+        "tags": [
+          "External Accounts"
+        ],
+        "responses": {
+          "200": {
+            "description": "The external account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExternalAccount"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteExternalAccount",
+        "summary": "Delete an external account",
+        "description": "Admin unlink — best-effort revoke against the IdP's\n`revocation_endpoint` when one is configured on the\ncorresponding `OauthProvider`, then drop the local row.\nRevocation failures don't block deletion.\n",
+        "tags": [
+          "External Accounts"
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
@@ -4835,6 +5213,364 @@
         }
       }
     },
+    "/v1/instance/appearance": {
+      "get": {
+        "operationId": "getInstanceAppearance",
+        "summary": "Get the appearance configuration",
+        "description": "Returns the operator-configured `Appearance` for this environment.\nMissing keys mean \"use the SDK default\" — an empty `{}` is a\ncompletely default-themed install.\n",
+        "tags": [
+          "Instance"
+        ],
+        "responses": {
+          "200": {
+            "description": "Appearance configuration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Appearance"
+                },
+                "examples": {
+                  "default": {
+                    "summary": "Defaults — operator has not set anything yet",
+                    "value": {}
+                  },
+                  "brand_color_only": {
+                    "summary": "Brand-colour override",
+                    "value": {
+                      "variables": {
+                        "colorPrimary": "#0a84ff",
+                        "colorTextOnPrimary": "#ffffff"
+                      },
+                      "layout": {
+                        "socialButtonsPlacement": "top"
+                      }
+                    }
+                  },
+                  "full": {
+                    "summary": "Full element-class + variables + layout override",
+                    "value": {
+                      "variables": {
+                        "colorPrimary": "rgb(10 132 255)",
+                        "colorBackground": "#0b1220",
+                        "colorText": "#e6edf3",
+                        "colorTextOnPrimary": "#ffffff",
+                        "fontFamily": "Inter, system-ui, sans-serif",
+                        "borderRadius": "0.5rem"
+                      },
+                      "elements": {
+                        "card": "shadow-2xl border border-slate-700",
+                        "formButtonPrimary": "tracking-wide uppercase",
+                        "formFieldInput": "ring-1 ring-slate-700",
+                        "headerTitle": "text-2xl",
+                        "socialButtonsBlockButton": "border border-slate-700",
+                        "footerActionLink": "text-sky-400"
+                      },
+                      "layout": {
+                        "logoImageUrl": "https://cdn.acme.com/logo-dark.svg",
+                        "logoLinkUrl": "https://acme.com",
+                        "socialButtonsPlacement": "bottom",
+                        "socialButtonsVariant": "blockButton",
+                        "showOptionalFields": false,
+                        "privacyPageUrl": "https://acme.com/privacy",
+                        "termsPageUrl": "https://acme.com/terms",
+                        "helpPageUrl": "https://acme.com/help",
+                        "animations": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "put": {
+        "operationId": "replaceInstanceAppearance",
+        "summary": "Replace the appearance configuration",
+        "description": "Full replacement — any key not present in the request body is\ncleared back to its default. Emits\n`instance.config.appearance_updated`.\n",
+        "tags": [
+          "Instance"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Appearance"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The replaced appearance configuration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Appearance"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateInstanceAppearance",
+        "summary": "Patch the appearance configuration",
+        "description": "Deep-merge update — supplied keys overwrite their counterparts in\n`variables` / `elements` / `layout`; unsupplied keys are left\nalone. Send a key with an explicit `null` to clear it back to the\ndefault. Emits `instance.config.appearance_updated`.\n",
+        "tags": [
+          "Instance"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Appearance"
+              },
+              "examples": {
+                "recolor": {
+                  "summary": "Update only the primary brand colour",
+                  "value": {
+                    "variables": {
+                      "colorPrimary": "#16a34a",
+                      "colorTextOnPrimary": "#ffffff"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated appearance configuration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Appearance"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          }
+        }
+      }
+    },
+    "/v1/instance/localization": {
+      "get": {
+        "operationId": "getInstanceLocalization",
+        "summary": "Get the localization configuration",
+        "description": "Returns the per-environment localization config — the locale\nset the SDK is allowed to surface, plus the operator's\noverrides. The canonical default catalogs are not returned\nhere; they ship with `@authn-sh/sdk-react`.\n",
+        "tags": [
+          "Instance"
+        ],
+        "responses": {
+          "200": {
+            "description": "Localization configuration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Localization"
+                },
+                "examples": {
+                  "defaults_only": {
+                    "summary": "Defaults — no operator overrides",
+                    "value": {
+                      "default_locale": "en-US",
+                      "fallback_locale": "en-US",
+                      "supported_locales": [
+                        "en-US",
+                        "pt-BR",
+                        "es-ES",
+                        "fr-FR",
+                        "de-DE"
+                      ],
+                      "overrides": {}
+                    }
+                  },
+                  "en_US_override": {
+                    "summary": "Single en-US override",
+                    "value": {
+                      "default_locale": "en-US",
+                      "fallback_locale": "en-US",
+                      "supported_locales": [
+                        "en-US",
+                        "pt-BR",
+                        "es-ES",
+                        "fr-FR",
+                        "de-DE"
+                      ],
+                      "overrides": {
+                        "en-US": {
+                          "signIn.start.title": "Welcome to Acme",
+                          "signIn.start.subtitle": "Sign in to continue to your dashboard."
+                        }
+                      }
+                    }
+                  },
+                  "sparse_pt_BR": {
+                    "summary": "Sparse pt-BR override (other keys fall back to canonical)",
+                    "value": {
+                      "default_locale": "pt-BR",
+                      "fallback_locale": "en-US",
+                      "supported_locales": [
+                        "en-US",
+                        "pt-BR"
+                      ],
+                      "overrides": {
+                        "pt-BR": {
+                          "signIn.start.title": "Bem-vindo de volta",
+                          "signIn.start.actionText": "Não tem uma conta?",
+                          "signIn.start.actionLink": "Criar conta"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "put": {
+        "operationId": "replaceInstanceLocalization",
+        "summary": "Replace the localization configuration",
+        "description": "Full replacement. Any locale / key not present in the body is\ncleared. Emits `localization.updated`.\n\nThe validator may reject the request with:\n\n- `422 invalid_locale_code` — `default_locale`, `fallback_locale`,\n  or an entry of `supported_locales[]` is not a valid BCP-47 tag.\n- `422 unsupported_locale` — `supported_locales[]` entry has no\n  bundled default catalog and no matching `overrides` entry.\n- `422 unknown_localization_key` — an override references a\n  dot-keyed path the canonical schema doesn't know about.\n",
+        "tags": [
+          "Instance"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Localization"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The replaced localization configuration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Localization"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateInstanceLocalization",
+        "summary": "Patch the localization configuration",
+        "description": "Sparse partial update. Merge semantics:\n\n- `default_locale` / `fallback_locale` — scalar replace.\n- `supported_locales[]` — full-array replace when supplied.\n- `overrides[locale]` — per-key merge. Sending\n  `{\"overrides\":{\"pt-BR\":{\"signIn.start.title\":\"X\"}}}` updates\n  only that one key on `pt-BR` and leaves every other `pt-BR`\n  key in place. Send a key with an explicit `null` to remove\n  that single override (the SDK falls back to the canonical\n  default).\n\nSame validators as `PUT`. Emits `localization.updated`.\n",
+        "tags": [
+          "Instance"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocalizationUpdateRequest"
+              },
+              "examples": {
+                "add_override": {
+                  "summary": "Add a single pt-BR override",
+                  "value": {
+                    "overrides": {
+                      "pt-BR": {
+                        "signIn.start.title": "Bem-vindo de volta"
+                      }
+                    }
+                  }
+                },
+                "remove_override": {
+                  "summary": "Clear an existing override key (falls back to canonical)",
+                  "value": {
+                    "overrides": {
+                      "pt-BR": {
+                        "signIn.start.title": null
+                      }
+                    }
+                  }
+                },
+                "rename_default": {
+                  "summary": "Promote pt-BR to the default locale",
+                  "value": {
+                    "default_locale": "pt-BR"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated localization configuration.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Localization"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          }
+        }
+      }
+    },
     "/v1/oauth-providers": {
       "get": {
         "operationId": "listOauthProviders",
@@ -5167,6 +5903,360 @@
                           "code": "oauth_discovery_refresh_failed",
                           "message": "Could not refresh /.well-known/openid-configuration",
                           "long_message": "The cached OIDC discovery document is older than 24h and a refresh attempt timed out. Verify the issuer URL and that the discovery endpoint is reachable from authn.sh."
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/v1/enterprise-connections": {
+      "get": {
+        "operationId": "listEnterpriseConnections",
+        "summary": "List enterprise connections",
+        "description": "Paginated list of every `EnterpriseConnection` row configured on\nthe environment, regardless of `enabled` state. Includes both\ninstance-wide (`organization_id: null`) and org-scoped rows by\ndefault; filter with `organization_id` to narrow down.\n",
+        "tags": [
+          "Enterprise Connections"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/LimitParam"
+          },
+          {
+            "$ref": "#/components/parameters/OffsetParam"
+          },
+          {
+            "name": "organization_id",
+            "in": "query",
+            "required": false,
+            "description": "Filter by scope. Supply an `Organization.id` to return only\nrows scoped to that org. Supply the literal string `null` to\nreturn only instance-wide rows. Omit to return both.\n",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of enterprise connections.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/PaginatedList"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/EnterpriseConnection"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createEnterpriseConnection",
+        "summary": "Create an instance-wide enterprise connection",
+        "description": "Register an instance-wide `EnterpriseConnection`. Two protocols:\n\n- `saml` — operator supplies `saml_idp_entity_id`, `saml_sso_url`,\n  and `saml_idp_certificate`. `saml_signing_algorithm` defaults to\n  `RSA_SHA256`. The server computes `saml_acs_url` and\n  `saml_sp_entity_id` from the new row's id and returns them on\n  the response — register both with the IdP.\n- `oidc` — operator supplies `oidc_issuer` and `oidc_client_id`.\n  The server fetches `<oidc_issuer>/.well-known/openid-configuration`\n  and populates `oidc_discovery_endpoint`. The computed\n  `oidc_redirect_uri` is returned — register it with the IdP.\n  `oidc_client_secret` is required unless the IdP supports\n  PKCE-only public clients.\n\nThis path is **instance-wide only** — `organization_id` is rejected\non POST through the BAPI. Per-org connections are created through\nthe FAPI at\n`POST /v1/organizations/{org_id}/enterprise-connections`, gated\nby the `org:sys_sso:manage` permission on the calling user's\nmembership.\n\nAll write-only secrets (`oidc_client_secret`, `saml_signing_key`)\nare encrypted at rest and never returned by any GET.\n",
+        "tags": [
+          "Enterprise Connections"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnterpriseConnectionRequest"
+              },
+              "examples": {
+                "saml_workspace_wide": {
+                  "summary": "Instance-wide SAML",
+                  "value": {
+                    "protocol": "saml",
+                    "name": "Workspace-wide Okta",
+                    "organization_id": null,
+                    "domains": [
+                      "staff.example"
+                    ],
+                    "saml_idp_entity_id": "https://staff-corp.okta.com/saml2/metadata",
+                    "saml_sso_url": "https://staff-corp.okta.com/sso/saml",
+                    "saml_idp_certificate": "-----BEGIN CERTIFICATE-----\nMIID...\n-----END CERTIFICATE-----"
+                  }
+                },
+                "oidc_workspace_wide": {
+                  "summary": "Instance-wide OIDC",
+                  "value": {
+                    "protocol": "oidc",
+                    "name": "Workspace-wide Okta",
+                    "organization_id": null,
+                    "domains": [
+                      "staff.example"
+                    ],
+                    "oidc_issuer": "https://staff-corp.okta.com",
+                    "oidc_client_id": "0oa1abcdEFGHIJKLM2x7",
+                    "oidc_client_secret": "shhhh",
+                    "oidc_scopes": [
+                      "openid",
+                      "profile",
+                      "email",
+                      "groups"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The created enterprise connection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnterpriseConnection"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          }
+        }
+      }
+    },
+    "/v1/enterprise-connections/{enterprise_connection_id}": {
+      "parameters": [
+        {
+          "name": "enterprise_connection_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getEnterpriseConnection",
+        "summary": "Get an enterprise connection",
+        "description": "Fetch a single `EnterpriseConnection` row. Write-only secrets\n(`oidc_client_secret`, `saml_signing_key`) are never included.\n",
+        "tags": [
+          "Enterprise Connections"
+        ],
+        "responses": {
+          "200": {
+            "description": "The enterprise connection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnterpriseConnection"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateEnterpriseConnection",
+        "summary": "Update an enterprise connection",
+        "description": "Partial update. `protocol` and `organization_id` are immutable —\nsending a different value returns `422`. Every other field is\noptional; omitted keys are left untouched.\n\nSending `oidc_client_secret: null` clears the stored secret (e.g.\nwhen migrating to PKCE). Sending `saml_signing_key: null` clears\nthe stored SP signing key (the platform will regenerate on the\nnext request signing).\n\nPatching `enabled` to `false` keeps existing `EnterpriseAccount`\nrows but prevents new sign-ins via this connection.\n",
+        "tags": [
+          "Enterprise Connections"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKeyHeader"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EnterpriseConnectionRequest"
+              },
+              "examples": {
+                "disable": {
+                  "summary": "Pause without deleting",
+                  "value": {
+                    "enabled": false
+                  }
+                },
+                "rotate_oidc_secret": {
+                  "summary": "Rotate the OIDC client secret",
+                  "value": {
+                    "oidc_client_secret": "new-shhhh"
+                  }
+                },
+                "rotate_saml_cert": {
+                  "summary": "Rotate the IdP signing certificate",
+                  "value": {
+                    "saml_idp_certificate": "-----BEGIN CERTIFICATE-----\nMIID...\n-----END CERTIFICATE-----"
+                  }
+                },
+                "extend_domains": {
+                  "summary": "Add a verified domain to the routing list",
+                  "value": {
+                    "domains": [
+                      "acme.example",
+                      "acme-corp.example"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The updated enterprise connection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnterpriseConnection"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/UnprocessableEntity"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteEnterpriseConnection",
+        "summary": "Delete an enterprise connection",
+        "description": "Soft delete. Refuses (`409 enterprise_connection_in_use`) when any\n`EnterpriseAccount` rows still link to this connection — operators\nmust migrate or unlink those users first to keep the audit trail\nof past sign-ins intact. Once deleted, the `enterprise_sso` and\n`saml` strategies pinned to this connection are rejected for this\nenvironment.\n",
+        "tags": [
+          "Enterprise Connections"
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v1/enterprise-connections/{enterprise_connection_id}/test": {
+      "parameters": [
+        {
+          "name": "enterprise_connection_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Id"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "testEnterpriseConnection",
+        "summary": "Dry-run an enterprise connection",
+        "description": "Probe the connection's configuration without redirecting any user.\nThe dashboard runs this on save to surface broken IdPs up front,\ninstead of letting an operator find out at sign-in time.\n\nThe server:\n\n- Builds the IdP authorize URL the SDK would redirect to (using a\n  synthetic `state` and the per-connection ACS / redirect URI) and\n  returns it on `authorize_url`.\n- For OIDC connections, `GET`s the `oidc_discovery_endpoint`\n  (resolved from `oidc_issuer`) and records the HTTP status on\n  `discovery_status`. `200` is healthy; other codes surface a\n  problem on the IdP side.\n- For SAML connections, fetches the IdP metadata XML from\n  `saml_idp_entity_id` (when the URL form is supplied), parses it,\n  and verifies the signature against `saml_idp_certificate`. The\n  HTTP status of the metadata fetch is reflected on\n  `discovery_status`.\n- Collects any errors (validation, OIDC discovery refresh, SAML\n  metadata signature failures, network timeouts) into `errors[]`.\n\nAlways returns `200` — even when probes fail. The caller inspects\n`errors[]` to decide whether to surface a red dot in the UI.\n",
+        "tags": [
+          "Enterprise Connections"
+        ],
+        "responses": {
+          "200": {
+            "description": "Probe result. Inspect `errors[]` to decide pass/fail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnterpriseConnectionTestResult"
+                },
+                "examples": {
+                  "healthy_saml": {
+                    "summary": "SAML — all probes passed",
+                    "value": {
+                      "authorize_url": "https://idp.acme.example/saml/sso?SAMLRequest=fVJBb%2FIwDP0r...",
+                      "discovery_status": 200,
+                      "errors": []
+                    }
+                  },
+                  "healthy_oidc": {
+                    "summary": "OIDC — all probes passed",
+                    "value": {
+                      "authorize_url": "https://login.microsoftonline.com/acme-tenant/v2.0/authorize?response_type=code&client_id=11111111-2222-3333-4444-555555555555&redirect_uri=https%3A%2F%2Facme.authn.sh%2Fv1%2Fenterprise-sso-callback&scope=openid+profile+email&state=test_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+                      "discovery_status": 200,
+                      "errors": []
+                    }
+                  },
+                  "misconfigured_discovery": {
+                    "summary": "OIDC — discovery endpoint returns 5xx",
+                    "value": {
+                      "authorize_url": "",
+                      "discovery_status": 502,
+                      "errors": [
+                        {
+                          "code": "enterprise_connection_discovery_unreachable",
+                          "message": "Could not reach the OIDC discovery endpoint",
+                          "long_message": "The IdP's /.well-known/openid-configuration endpoint returned 502. Verify the issuer URL and that authn.sh can reach the IdP."
+                        }
+                      ]
+                    }
+                  },
+                  "saml_metadata_invalid": {
+                    "summary": "SAML — metadata signature verification failed",
+                    "value": {
+                      "authorize_url": "",
+                      "discovery_status": null,
+                      "errors": [
+                        {
+                          "code": "enterprise_connection_saml_metadata_invalid",
+                          "message": "SAML metadata did not parse",
+                          "long_message": "Fetched the IdP metadata XML but signature verification failed. Verify saml_idp_certificate matches the IdP's signing key."
                         }
                       ]
                     }
@@ -5879,6 +6969,90 @@
                       ],
                       "total_count": 1
                     }
+                  },
+                  "enterprise_connection_created": {
+                    "summary": "enterpriseConnection.created delivery",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "whd_01HKX9SY9V7H7TF8C8K7J9X4ZQ",
+                          "object": "webhook_delivery",
+                          "endpoint_id": "whe_01HKX9SY9V7H7TF8C8K7J9X4ZH",
+                          "event_id": "evt_01HKX9SY9V7H7TF8C8K7J9X4ZN",
+                          "event_type": "enterpriseConnection.created",
+                          "attempt": 1,
+                          "response_status": 200,
+                          "response_body": "{\"ok\":true}",
+                          "next_retry_at": null,
+                          "succeeded": true,
+                          "created_at": 1714896500000
+                        }
+                      ],
+                      "total_count": 1
+                    }
+                  },
+                  "enterprise_account_connected": {
+                    "summary": "enterpriseAccount.connected delivery",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "whd_01HKX9SY9V7H7TF8C8K7J9X4ZR",
+                          "object": "webhook_delivery",
+                          "endpoint_id": "whe_01HKX9SY9V7H7TF8C8K7J9X4ZH",
+                          "event_id": "evt_01HKX9SY9V7H7TF8C8K7J9X4ZP",
+                          "event_type": "enterpriseAccount.connected",
+                          "attempt": 1,
+                          "response_status": 200,
+                          "response_body": "{\"ok\":true}",
+                          "next_retry_at": null,
+                          "succeeded": true,
+                          "created_at": 1714896600000
+                        }
+                      ],
+                      "total_count": 1
+                    }
+                  },
+                  "scim_token_issued": {
+                    "summary": "scimToken.issued delivery",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "whd_01HKX9SY9V7H7TF8C8K7J9X4ZS",
+                          "object": "webhook_delivery",
+                          "endpoint_id": "whe_01HKX9SY9V7H7TF8C8K7J9X4ZH",
+                          "event_id": "evt_01HKX9SY9V7H7TF8C8K7J9X4ZQ",
+                          "event_type": "scimToken.issued",
+                          "attempt": 1,
+                          "response_status": 200,
+                          "response_body": "{\"ok\":true}",
+                          "next_retry_at": null,
+                          "succeeded": true,
+                          "created_at": 1714896700000
+                        }
+                      ],
+                      "total_count": 1
+                    }
+                  },
+                  "scim_user_provisioned": {
+                    "summary": "scimUser.provisioned delivery",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "whd_01HKX9SY9V7H7TF8C8K7J9X4ZT",
+                          "object": "webhook_delivery",
+                          "endpoint_id": "whe_01HKX9SY9V7H7TF8C8K7J9X4ZH",
+                          "event_id": "evt_01HKX9SY9V7H7TF8C8K7J9X4ZR",
+                          "event_type": "scimUser.provisioned",
+                          "attempt": 1,
+                          "response_status": 200,
+                          "response_body": "{\"ok\":true}",
+                          "next_retry_at": null,
+                          "succeeded": true,
+                          "created_at": 1714896800000
+                        }
+                      ],
+                      "total_count": 1
+                    }
                   }
                 }
               }
@@ -6116,6 +7290,7 @@
           "nonce",
           "external_verification_redirect_url",
           "error",
+          "enterprise_connection_id",
           "created_at",
           "updated_at"
         ],
@@ -6183,7 +7358,7 @@
           },
           "strategy": {
             "type": "string",
-            "description": "How this challenge is being completed.\n\n- `password`, `email_code`, `email_link`,\n  `reset_password_email_code`, `ticket`, `transfer` — sign-in /\n  sign-up first factor.\n- `oauth_<provider_key>` — first-factor social sign-in / sign-up.\n  `<provider_key>` matches a row in the environment's\n  `OauthProvider` registry (`google`, `github`, `apple`,\n  `microsoft`, or any workspace-registered `custom_oidc` /\n  `custom_oauth2` slug). The challenge surfaces the IdP's\n  authorize URL on `external_verification_redirect_url`; the SDK\n  redirects the browser there and resumes via\n  `/v1/oauth-callback/<provider_key>`.\n- `phone_code` — SMS code, served two ways:\n    - **First factor on sign-up** (`step: \"single\"`) when the\n      env's `attributes.phone_number != \"off\"` and the user\n      supplied a phone in the `SignUp` attempt.\n    - **Second factor on sign-in** (`step: \"second\"`) when the\n      user has at least one `PhoneNumber` row with\n      `reserved_for_second_factor: true` and the env has\n      `multi_factor.phone_code.enabled: true`.\n    - **Phone-number verification on a signed-in user**\n      (`step: \"single\"`) issued against a parent\n      `phone_number_id`, mirroring `email_code` against an\n      `EmailAddress`.\n  Answer with `{ code: \"123456\" }` (numeric, 6 digits).\n- `totp`, `backup_code` — sign-in second factor (`step: \"second\"`\n  only). Answer with `{ code: \"123456\" }` for `totp` (numeric,\n  6 digits, `±1 step` tolerance) or `{ code: \"abcd-efgh\" }` for\n  `backup_code` (single-use, hashed at rest).\n- `email_code`, `email_link` — email-address verification on a\n  signed-in user.\n- `domain_dns_txt`, `email_code` — organization-domain\n  verification.\n\nFuture strategies (passkey) plug in here without spec changes.\n",
+            "description": "How this challenge is being completed.\n\n- `password`, `email_code`, `email_link`,\n  `reset_password_email_code`, `ticket`, `transfer` — sign-in /\n  sign-up first factor.\n- `oauth_<provider_key>` — first-factor social sign-in / sign-up.\n  `<provider_key>` matches a row in the environment's\n  `OauthProvider` registry (presets: `google`, `github`,\n  `apple`, `microsoft`, `discord`, `facebook`, `linkedin`,\n  `x`, `gitlab`, `slack`; or any workspace-registered\n  `custom_oidc` / `custom_oauth2` slug). The challenge\n  surfaces the IdP's authorize URL on\n  `external_verification_redirect_url`; the SDK redirects the\n  browser there and resumes via\n  `/v1/oauth-callback/<provider_key>`.\n- `phone_code` — SMS code, served two ways:\n    - **First factor on sign-up** (`step: \"single\"`) when the\n      env's `attributes.phone_number != \"off\"` and the user\n      supplied a phone in the `SignUp` attempt.\n    - **Second factor on sign-in** (`step: \"second\"`) when the\n      user has at least one `PhoneNumber` row with\n      `reserved_for_second_factor: true` and the env has\n      `multi_factor.phone_code.enabled: true`.\n    - **Phone-number verification on a signed-in user**\n      (`step: \"single\"`) issued against a parent\n      `phone_number_id`, mirroring `email_code` against an\n      `EmailAddress`.\n  Answer with `{ code: \"123456\" }` (numeric, 6 digits).\n- `totp`, `backup_code` — sign-in second factor (`step: \"second\"`\n  only). Answer with `{ code: \"123456\" }` for `totp` (numeric,\n  6 digits, `±1 step` tolerance) or `{ code: \"abcd-efgh\" }` for\n  `backup_code` (single-use, hashed at rest).\n- `email_code`, `email_link` — email-address verification on a\n  signed-in user.\n- `domain_dns_txt`, `email_code` — organization-domain\n  verification.\n- `passkey` — WebAuthn assertion against an enrolled `Passkey`.\n  First factor on `SignIn` (`step: \"first\"`). The challenge\n  surfaces the server-issued PublicKeyCredentialRequestOptions\n  (allowed credentials, RP id, user-verification policy) on\n  creation; the SDK runs `navigator.credentials.get(...)` and\n  answers with the attestation response.\n- `enterprise_sso` — generic enterprise-IdP first factor. The\n  server resolves the right `EnterpriseConnection` from the\n  identifier-domain → `EnterpriseConnection.domains[]` lookup,\n  then mints the IdP-side authorize URL (SAML `<AuthnRequest>`\n  on `saml_sso_url` or OIDC `/authorize` on the discovered\n  `authorization_endpoint`) and surfaces it on\n  `external_verification_redirect_url`. The SDK redirects the\n  browser there and resumes at `/v1/saml/{id}/acs` (SAML) or\n  `/v1/enterprise-sso-callback` (OIDC). v0.6+.\n- `saml` — protocol-specific variant when the SDK already knows\n  the connection (org picker, wizard preview). Caller supplies\n  `enterprise_connection_id` on `ChallengeCreateRequest`; only\n  legal for connections with `protocol: \"saml\"`. Otherwise\n  identical to `enterprise_sso`. v0.6+.\n",
             "examples": [
               "password",
               "email_code",
@@ -6195,8 +7370,19 @@
               "totp",
               "backup_code",
               "oauth_google",
+              "oauth_github",
+              "oauth_apple",
+              "oauth_microsoft",
+              "oauth_discord",
+              "oauth_facebook",
+              "oauth_linkedin",
+              "oauth_x",
+              "oauth_gitlab",
+              "oauth_slack",
               "phone_code",
-              "passkey"
+              "passkey",
+              "enterprise_sso",
+              "saml"
             ]
           },
           "status": {
@@ -6256,6 +7442,39 @@
               }
             ]
           },
+          "creation_options": {
+            "description": "Server-built `PublicKeyCredentialCreationOptions` for the\npasskey *registration* ceremony. Present on challenges\ncreated by `POST /v1/me/passkeys/begin-registration`\n(`strategy: \"passkey\"`, `mode: \"registration\"`); `null`\notherwise. Stable for the challenge's lifetime so multi-tab\nclients can resume.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PasskeyCreationOptions"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "request_options": {
+            "description": "Server-built `PublicKeyCredentialRequestOptions` for the\npasskey *authentication* ceremony. Present on first-factor\nsign-in / sign-up challenges created with\n`strategy: \"passkey\"`; `null` otherwise. Stable for the\nchallenge's lifetime.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PasskeyRequestOptions"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enterprise_connection_id": {
+            "description": "`EnterpriseConnection.id` the challenge resolved against.\nPopulated when `strategy` is `enterprise_sso` (domain-routed\nresolution) or `saml` (caller-supplied\n`enterprise_connection_id` on the request body). `null` for\nevery other strategy. v0.6+.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Id"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "created_at": {
             "$ref": "#/components/schemas/Timestamp"
           },
@@ -6279,6 +7498,7 @@
             "nonce": "poll_01HKX9SY9V7H7TF8C8K7J9X4ZF",
             "external_verification_redirect_url": "https://acme.authn.sh/v1/client/handshake?__authn_ticket=tkt_01HKX9SY9V7H7TF8C8K7J9X4ZG&__authn_status=complete",
             "error": null,
+            "enterprise_connection_id": null,
             "created_at": 1714723000000,
             "updated_at": 1714723000000
           },
@@ -6297,6 +7517,7 @@
             "nonce": null,
             "external_verification_redirect_url": null,
             "error": null,
+            "enterprise_connection_id": null,
             "created_at": 1714723000000,
             "updated_at": 1714723500000
           },
@@ -6315,6 +7536,7 @@
             "nonce": null,
             "external_verification_redirect_url": null,
             "error": null,
+            "enterprise_connection_id": null,
             "created_at": 1714723000000,
             "updated_at": 1714723000000
           },
@@ -6333,6 +7555,7 @@
             "nonce": "authn-domain-verification=01HKX9SY9V7H7TF8C8K7J9X4ZQ",
             "external_verification_redirect_url": null,
             "error": null,
+            "enterprise_connection_id": null,
             "created_at": 1714896900000,
             "updated_at": 1714896900000
           },
@@ -6351,6 +7574,7 @@
             "nonce": null,
             "external_verification_redirect_url": null,
             "error": null,
+            "enterprise_connection_id": null,
             "created_at": 1714723000000,
             "updated_at": 1714723000000
           },
@@ -6369,14 +7593,53 @@
             "nonce": null,
             "external_verification_redirect_url": null,
             "error": null,
+            "enterprise_connection_id": null,
             "created_at": 1714723000000,
             "updated_at": 1714723500000
+          },
+          {
+            "id": "chal_01HKX9SY9V7H7TF8C8K7J9X4ZV",
+            "object": "challenge",
+            "sign_in_id": "sia_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+            "sign_up_id": null,
+            "email_address_id": null,
+            "organization_domain_id": null,
+            "step": "first",
+            "strategy": "enterprise_sso",
+            "status": "pending",
+            "attempts": 0,
+            "expire_at": 1714724000000,
+            "nonce": null,
+            "external_verification_redirect_url": "https://idp.acme.example/saml/sso?SAMLRequest=...",
+            "error": null,
+            "enterprise_connection_id": "entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+            "created_at": 1714723000000,
+            "updated_at": 1714723000000
+          },
+          {
+            "id": "chal_01HKX9SY9V7H7TF8C8K7J9X4ZW",
+            "object": "challenge",
+            "sign_in_id": "sia_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+            "sign_up_id": null,
+            "email_address_id": null,
+            "organization_domain_id": null,
+            "step": "first",
+            "strategy": "saml",
+            "status": "pending",
+            "attempts": 0,
+            "expire_at": 1714724000000,
+            "nonce": null,
+            "external_verification_redirect_url": "https://idp.acme.example/saml/sso?SAMLRequest=...",
+            "error": null,
+            "enterprise_connection_id": "entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+            "created_at": 1714723000000,
+            "updated_at": 1714723000000
           }
         ]
       },
       "ChallengeCreateRequest": {
         "type": "object",
-        "description": "Body for `POST /…/challenges` against any parent that owns\nchallenges (`SignIn`, `SignUp`, `EmailAddress`, `OrganizationDomain`).\nPicks a strategy and supplies any fields the strategy needs to\n*issue* the challenge (e.g. which identifier to send the code to,\nwhich redirect URL to bounce back to).\n\nThe answer to the challenge is submitted separately via\n`POST .../challenges/{cid}/answer` with `ChallengeAnswerRequest`.\nStrategies that have nothing to issue (e.g. `password`,\n`domain_dns_txt`, `totp`, `backup_code`) return a `pending` challenge\nstraight away — for `domain_dns_txt` the proof token is surfaced in\n`nonce`; for `password`, `totp`, and `backup_code` `nonce` stays\n`null` and the caller proceeds straight to `answer`.\n\nPer-parent legal strategies:\n\n- `SignIn` (first factor) — `password`, `email_code`, `email_link`,\n  `phone_code`, `oauth_<provider_key>`,\n  `reset_password_email_code`, `ticket`, `transfer`.\n  `oauth_<provider_key>` requires `redirect_url` and\n  `redirect_url_complete` — the server bakes them into the IdP\n  `state` and surfaces the IdP's authorize URL on\n  `external_verification_redirect_url`. `step` is server-assigned\n  `first`; OAuth never serves as second factor.\n- `SignIn` (second factor) — `totp`, `backup_code`, `phone_code`.\n  Only legal when the parent SignIn is in `needs_second_factor`; the\n  server narrows `SignIn.supported_strategies` to the second-factor\n  methods the resolved user has enrolled. `step` on the resulting\n  Challenge is set to `\"second\"`. `phone_code` here defaults to the\n  user's `default_second_factor` phone, falling back to\n  `User.primary_phone_number_id`; supply `phone_number_id`\n  explicitly to target a different reserved-for-MFA row.\n- `SignUp` — `email_code`, `email_link`, `phone_code`,\n  `oauth_<provider_key>`, `ticket`, `transfer`. Sign-up never gains\n  a second factor — the `phone_code` here is the first-factor\n  phone-attribute path; `oauth_<provider_key>` is the first-factor\n  social-sign-up path (subject to `OauthProvider.allow_sign_up`).\n- `EmailAddress` — `email_code`, `email_link`.\n- `PhoneNumber` — `phone_code`. Used by FAPI\n  `/v1/me/phone-numbers/{id}/challenges` to verify additional phone\n  numbers on an already-signed-in user.\n- `OrganizationDomain` — `domain_dns_txt`, `email_code`.\n",
+        "description": "Body for `POST /…/challenges` against any parent that owns\nchallenges (`SignIn`, `SignUp`, `EmailAddress`, `OrganizationDomain`).\nPicks a strategy and supplies any fields the strategy needs to\n*issue* the challenge (e.g. which identifier to send the code to,\nwhich redirect URL to bounce back to).\n\nThe answer to the challenge is submitted separately via\n`POST .../challenges/{cid}/answer` with `ChallengeAnswerRequest`.\nStrategies that have nothing to issue (e.g. `password`,\n`domain_dns_txt`, `totp`, `backup_code`) return a `pending` challenge\nstraight away — for `domain_dns_txt` the proof token is surfaced in\n`nonce`; for `password`, `totp`, and `backup_code` `nonce` stays\n`null` and the caller proceeds straight to `answer`.\n\nPer-parent legal strategies:\n\n- `SignIn` (first factor) — `password`, `email_code`, `email_link`,\n  `phone_code`, `oauth_<provider_key>`, `passkey`, `enterprise_sso`,\n  `saml`, `reset_password_email_code`, `ticket`, `transfer`.\n  `oauth_<provider_key>` requires `redirect_url` and\n  `redirect_url_complete` — the server bakes them into the IdP\n  `state` and surfaces the IdP's authorize URL on\n  `external_verification_redirect_url`. `step` is server-assigned\n  `first`; OAuth never serves as second factor. `passkey` needs\n  no extra fields on the body — the server fills\n  `Challenge.request_options` with the WebAuthn ceremony params\n  (allow-credentials derived from the resolved user's verified\n  passkeys); the SDK runs `navigator.credentials.get(...)` and\n  answers with the assertion.\n- `SignIn` (second factor) — `totp`, `backup_code`, `phone_code`.\n  Only legal when the parent SignIn is in `needs_second_factor`; the\n  server narrows `SignIn.supported_strategies` to the second-factor\n  methods the resolved user has enrolled. `step` on the resulting\n  Challenge is set to `\"second\"`. `phone_code` here defaults to the\n  user's `default_second_factor` phone, falling back to\n  `User.primary_phone_number_id`; supply `phone_number_id`\n  explicitly to target a different reserved-for-MFA row.\n- `SignUp` — `email_code`, `email_link`, `phone_code`,\n  `oauth_<provider_key>`, `passkey`, `enterprise_sso`, `saml`,\n  `ticket`, `transfer`. Sign-up never gains a second factor — the\n  `phone_code` here is the first-factor phone-attribute path;\n  `oauth_<provider_key>` is the first-factor social-sign-up path\n  (subject to `OauthProvider.allow_sign_up`). `passkey` on a\n  sign-up parent is used when the identifier already resolves to\n  a user with ≥1 verified passkey — the resulting challenge flips\n  to `transferable` so the SDK bounces to sign-in. `enterprise_sso`\n  / `saml` mint a `User` + `EnterpriseAccount` on a fresh identity\n  or flip to `transferable` when the IdP-asserted identity already\n  has a `User`.\n- `EmailAddress` — `email_code`, `email_link`.\n- `PhoneNumber` — `phone_code`. Used by FAPI\n  `/v1/me/phone-numbers/{id}/challenges` to verify additional phone\n  numbers on an already-signed-in user.\n- `OrganizationDomain` — `domain_dns_txt`, `email_code`.\n",
         "required": [
           "strategy"
         ],
@@ -6384,7 +7647,7 @@
         "properties": {
           "strategy": {
             "type": "string",
-            "description": "Strategy across all parents:\n`password`, `email_code`, `email_link`, `phone_code`,\n`oauth_<provider_key>`, `reset_password_email_code`, `ticket`,\n`transfer`, `domain_dns_txt`, `totp`, `backup_code`.\n`oauth_<provider_key>` resolves against the environment's\n`OauthProvider` registry — `<provider_key>` matches\n`^[a-z][a-z0-9_]*$`. Future strategies (passkey) plug in here\nwithout spec changes.\n",
+            "description": "Strategy across all parents:\n`password`, `email_code`, `email_link`, `phone_code`,\n`oauth_<provider_key>`, `passkey`, `enterprise_sso`, `saml`,\n`reset_password_email_code`, `ticket`, `transfer`,\n`domain_dns_txt`, `totp`, `backup_code`.\n`oauth_<provider_key>` resolves against the environment's\n`OauthProvider` registry — `<provider_key>` matches\n`^[a-z][a-z0-9_]*$`. `enterprise_sso` is identifier-less\ndomain-routed; `saml` requires `enterprise_connection_id` on\nthe body and is only legal for connections with\n`protocol: \"saml\"`.\n",
             "examples": [
               "password",
               "email_code",
@@ -6397,7 +7660,10 @@
               "transfer",
               "domain_dns_txt",
               "totp",
-              "backup_code"
+              "backup_code",
+              "passkey",
+              "enterprise_sso",
+              "saml"
             ]
           },
           "email_address_id": {
@@ -6416,7 +7682,11 @@
           "redirect_url_complete": {
             "type": "string",
             "format": "uri",
-            "description": "For `oauth_<provider_key>`, the URL the SDK should land the\nuser on after the parent flow finishes successfully (or flips\nto `transferable`). Must be on the redirect-URL allowlist.\nRequired when `strategy` starts with `oauth_`; ignored\notherwise.\n"
+            "description": "For `oauth_<provider_key>` / `enterprise_sso` / `saml`, the\nURL the SDK should land the user on after the parent flow\nfinishes successfully (or flips to `transferable`). Must be\non the redirect-URL allowlist. Required when `strategy` is\n`oauth_<provider_key>`, `enterprise_sso`, or `saml`; ignored\notherwise.\n"
+          },
+          "enterprise_connection_id": {
+            "type": "string",
+            "description": "Required when `strategy` is `saml` — the\n`EnterpriseConnection.id` (`entcon_…`) to drive the SAML flow\nagainst. Only legal for connections with `protocol: \"saml\"`.\nOptional for `enterprise_sso` (omit to let domain routing\npick); when supplied for `enterprise_sso` it pins the\nChallenge to that connection without domain routing.\nIgnored for every other strategy.\n"
           }
         },
         "examples": [
@@ -6464,12 +7734,26 @@
           },
           {
             "strategy": "backup_code"
+          },
+          {
+            "strategy": "passkey"
+          },
+          {
+            "strategy": "enterprise_sso",
+            "redirect_url": "https://app.acme.com/sign-in",
+            "redirect_url_complete": "https://app.acme.com/dashboard"
+          },
+          {
+            "strategy": "saml",
+            "enterprise_connection_id": "entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+            "redirect_url": "https://app.acme.com/sign-in",
+            "redirect_url_complete": "https://app.acme.com/dashboard"
           }
         ]
       },
       "ChallengeAnswerRequest": {
         "type": "object",
-        "description": "Body for `POST /…/challenges/{cid}/answer` against any parent that\nowns challenges (`SignIn`, `SignUp`, `EmailAddress`,\n`OrganizationDomain`). The challenge already knows its strategy;\nthe body carries the strategy-specific answer.\n\n- `password` — `{ password: \"…\" }`.\n- `email_code` / `reset_password_email_code` — `{ code: \"123456\" }`.\n- `ticket` — `{ ticket: \"…\" }`.\n- `email_link` — `{ }` (empty body). This commits the SDK to polling\n  `GET .../challenges/{cid}`; the verification happens out-of-band when\n  the user clicks the magic link. The response is the polled state,\n  not a synchronous success.\n- `domain_dns_txt` — `{ }` (empty body). Hints the server to attempt\n  the DNS lookup right now. The response reflects the immediate\n  result — `verified` if the TXT record was visible, `pending` if\n  the lookup was queued. The server keeps polling DNS in the\n  background regardless.\n- `totp` — `{ code: \"123456\" }`. 6-digit numeric TOTP. Server checks\n  against the user's stored secret with a `±1 step` (30s) window.\n  Only legal on a `step: \"second\"` Challenge bound to a SignIn.\n- `backup_code` — `{ code: \"abcd-efgh\" }`. Single-use recovery code\n  in `xxxx-xxxx` format. The matching row is marked consumed on\n  success and can never be reused. Only legal on a `step: \"second\"`\n  Challenge bound to a SignIn.\n- `signature` is reserved for v0.5 (passkey).\n\nOn a `reset_password_email_code` answer the parent SignIn transitions\nto `needs_new_password`; the caller then creates a fresh `password`\nchallenge and answers it with the new password, which advances the\nsign-in to `complete`.\n",
+        "description": "Body for `POST /…/challenges/{cid}/answer` against any parent that\nowns challenges (`SignIn`, `SignUp`, `EmailAddress`,\n`OrganizationDomain`). The challenge already knows its strategy;\nthe body carries the strategy-specific answer.\n\n- `password` — `{ password: \"…\" }`.\n- `email_code` / `reset_password_email_code` — `{ code: \"123456\" }`.\n- `ticket` — `{ ticket: \"…\" }`.\n- `email_link` — `{ }` (empty body). This commits the SDK to polling\n  `GET .../challenges/{cid}`; the verification happens out-of-band when\n  the user clicks the magic link. The response is the polled state,\n  not a synchronous success.\n- `domain_dns_txt` — `{ }` (empty body). Hints the server to attempt\n  the DNS lookup right now. The response reflects the immediate\n  result — `verified` if the TXT record was visible, `pending` if\n  the lookup was queued. The server keeps polling DNS in the\n  background regardless.\n- `totp` — `{ code: \"123456\" }`. 6-digit numeric TOTP. Server checks\n  against the user's stored secret with a `±1 step` (30s) window.\n  Only legal on a `step: \"second\"` Challenge bound to a SignIn.\n- `backup_code` — `{ code: \"abcd-efgh\" }`. Single-use recovery code\n  in `xxxx-xxxx` format. The matching row is marked consumed on\n  success and can never be reused. Only legal on a `step: \"second\"`\n  Challenge bound to a SignIn.\n- `passkey` — `{ assertion: { id, raw_id, response: { client_data_json,\n  authenticator_data, signature, user_handle }, type } }`. The SDK\n  runs `navigator.credentials.get(challenge.request_options)` and\n  posts the resulting `AuthenticatorAssertionResponse` verbatim,\n  base64url-encoded. The server verifies the signature against\n  the stored public key for the matching `Passkey` row, checks\n  the embedded challenge / origin / RP-ID, and bumps the row's\n  monotonic sign-count.\n\nOn a `reset_password_email_code` answer the parent SignIn transitions\nto `needs_new_password`; the caller then creates a fresh `password`\nchallenge and answers it with the new password, which advances the\nsign-in to `complete`.\n",
         "additionalProperties": false,
         "properties": {
           "password": {
@@ -6481,9 +7765,9 @@
           "ticket": {
             "type": "string"
           },
-          "signature": {
-            "type": "string",
-            "description": "Reserved for v0.5 (passkey)."
+          "assertion": {
+            "description": "WebAuthn assertion response for `passkey` challenges. Bound\nto the parent challenge's `request_options.challenge` nonce.\n",
+            "$ref": "#/components/schemas/PasskeyAssertion"
           }
         },
         "examples": [
@@ -6496,7 +7780,20 @@
           {
             "code": "abcd-efgh"
           },
-          {}
+          {},
+          {
+            "assertion": {
+              "id": "a2V5LWlk",
+              "raw_id": "a2V5LWlk",
+              "type": "public-key",
+              "response": {
+                "client_data_json": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0Iiwi…",
+                "authenticator_data": "SZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVz…",
+                "signature": "MEUCIQDH7dy…",
+                "user_handle": "dXNlci1oYW5kbGU"
+              }
+            }
+          }
         ]
       },
       "TotpSecret": {
@@ -7088,9 +8385,112 @@
           }
         ]
       },
+      "Passkey": {
+        "type": "object",
+        "description": "A WebAuthn authenticator credential registered against a `User`. One\nrow per registered authenticator — a user with a hardware key plus a\nplatform authenticator (e.g. Touch ID) has two `Passkey` rows.\n\n### Public surface only\n\nThe raw `credential_id` bytes, the COSE-encoded `public_key`, and the\nauthenticator's `sign_count` never appear in any payload. Those are\nthe secret/operational fields the WebAuthn server library reads\ndirectly from the database during assertion verification; they're\nstored encrypted at rest and exposed only inside the server.\n\nWhat the SDK sees is the human-facing surface: a `nickname` the user\npicked, the `transports[]` the authenticator advertised at\nregistration (so the browser can hint the right discovery flow), and\nan opaque `aaguid` that surfaces the authenticator model when the\nauthenticator chose to attest it.\n\n### Identifier\n\nID prefix `pkey_` (e.g. `pkey_01HKX9SY9V7H7TF8C8K7J9X4ZA`).\n\n### Verification\n\nA `Passkey` row is created in the unverified state by the registration\nceremony's `options` step and flipped to `verified: true` once the\nmatching attestation response is accepted. Unverified rows are\ngarbage-collected if the ceremony is never completed.\n",
+        "required": [
+          "id",
+          "object",
+          "nickname",
+          "transports",
+          "aaguid",
+          "verified",
+          "last_used_at",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "object": {
+            "type": "string",
+            "const": "passkey"
+          },
+          "nickname": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "User-supplied label so the user can tell their authenticators\napart in `<UserProfile />` (`\"YubiKey 5C\"`, `\"MacBook Touch ID\"`).\nDefaults to a server-generated string at registration time if the\ncaller does not supply one.\n"
+          },
+          "transports": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "usb",
+                "nfc",
+                "ble",
+                "internal",
+                "hybrid"
+              ]
+            },
+            "description": "Transports the authenticator advertised at registration. Surfaced\nverbatim to the browser at assertion time so the WebAuthn UI can\nhint the right discovery flow (e.g. `internal` for platform\nauthenticators, `usb` for roaming security keys, `hybrid` for\ncross-device passkey flows). May be empty if the authenticator\ndid not declare any transports.\n"
+          },
+          "aaguid": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The Authenticator Attestation GUID — a 128-bit identifier the\nauthenticator chose to disclose, surfacing the authenticator\nmodel (e.g. a specific YubiKey SKU, an iCloud Keychain device).\n`null` when the authenticator returned the zero AAGUID (the\ncommon case for platform authenticators that decline to attest a\nmodel).\n"
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "`true` once the registration ceremony's attestation response was\naccepted (mirrors `verified_at IS NOT NULL` on the row). `false`\nwhile a ceremony is in flight; such rows are garbage-collected if\nthe ceremony is abandoned.\n"
+          },
+          "last_used_at": {
+            "description": "Most recent successful assertion (sign-in or step-up) against\nthis credential. `null` until the first successful use after\nregistration.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "examples": [
+          {
+            "id": "pkey_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+            "object": "passkey",
+            "nickname": "YubiKey 5C",
+            "transports": [
+              "usb",
+              "nfc"
+            ],
+            "aaguid": "ee882879-721c-4913-9775-3dfcce97072a",
+            "verified": true,
+            "last_used_at": 1714896500000,
+            "created_at": 1714723000000,
+            "updated_at": 1714896500000
+          },
+          {
+            "id": "pkey_01HKX9SY9V7H7TF8C8K7J9X4ZB",
+            "object": "passkey",
+            "nickname": "MacBook Touch ID",
+            "transports": [
+              "internal",
+              "hybrid"
+            ],
+            "aaguid": null,
+            "verified": true,
+            "last_used_at": null,
+            "created_at": 1714724000000,
+            "updated_at": 1714724000000
+          }
+        ]
+      },
       "User": {
         "type": "object",
-        "description": "An end-user identity within an `Environment`. Carries the canonical\nidentifier set (email addresses, phone numbers, external accounts,\npasskeys), the auth-state flags (password, MFA), the moderation state\n(banned, locked), the lifecycle timestamps, and the three flavours of\nmetadata.\n\nExternal accounts, enterprise accounts, and passkeys are present in\nthe shape today (as empty arrays before their respective milestones\nship) so SDKs can generate stable types up front; the corresponding\nendpoints land in later milestones (v0.5 / v0.6).\n",
+        "description": "An end-user identity within an `Environment`. Carries the canonical\nidentifier set (email addresses, phone numbers, external accounts,\npasskeys), the auth-state flags (password, MFA), the moderation state\n(banned, locked), the lifecycle timestamps, and the three flavours of\nmetadata.\n\nExternal accounts and passkeys are populated by their respective\nendpoints (`/v1/me/external-accounts`, `/v1/me/passkeys`). Enterprise\naccounts are populated by `/v1/saml/{id}/acs` and\n`/v1/enterprise-sso-callback` on enterprise-SSO sign-in (v0.6+).\n",
         "required": [
           "id",
           "object",
@@ -7099,6 +8499,7 @@
           "external_accounts",
           "enterprise_accounts",
           "passkeys",
+          "passkey_count",
           "has_image",
           "password_enabled",
           "two_factor_enabled",
@@ -7198,19 +8599,22 @@
           },
           "enterprise_accounts": {
             "type": "array",
-            "description": "Reserved for v0.6 (enterprise SSO). Always `[]` in v0.1.\n",
+            "description": "Enterprise SSO links — one row per `EnterpriseConnection` the user\nhas signed in through. Populated by `/v1/saml/{id}/acs` (SAML) and\n`/v1/enterprise-sso-callback` (OIDC). Empty until the user\ncompletes their first enterprise-SSO sign-in.\n",
             "items": {
-              "type": "object",
-              "additionalProperties": true
+              "$ref": "#/components/schemas/EnterpriseAccount"
             }
           },
           "passkeys": {
             "type": "array",
-            "description": "Reserved for v0.5 (WebAuthn). Always `[]` in v0.1.\n",
+            "description": "WebAuthn credentials registered against this user. One row per\nauthenticator — a user with a hardware key plus a platform\nauthenticator (e.g. Touch ID) has two entries. Empty until the\nuser enrolls their first passkey via `/v1/me/passkeys`.\n",
             "items": {
-              "type": "object",
-              "additionalProperties": true
+              "$ref": "#/components/schemas/Passkey"
             }
+          },
+          "passkey_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Count of `passkeys[]`. Surfaced separately so UI badges\n(`<UserButton />`, `<UserProfile />` security tab) can render\nwithout forcing the full list to be loaded on cold paths.\n"
           },
           "password_enabled": {
             "type": "boolean",
@@ -8387,6 +9791,394 @@
           }
         }
       },
+      "Appearance": {
+        "type": "object",
+        "description": "Operator-configured visual customisation for the bundled\ncomponents (`<SignIn />`, `<SignUp />`, `<UserProfile />`, …).\nConfigured once per environment via BAPI; the SDK reads the live\ncopy from `GET /v1/environment` and merges with consumer-supplied\nprops at render time.\n\n### Three-axis customisation\n\n- `variables` — CSS design tokens (colours, fonts, sizing). Loose\n  string typing — the server doesn't validate hex vs. `rgb()` vs.\n  named colours, just round-trips whatever the operator wrote.\n  Tokens are applied as CSS custom properties on the component\n  root.\n- `elements` — className override map keyed by stable element\n  names. Values are space-separated className strings the SDK\n  appends to the default class list, so consumers can layer their\n  Tailwind / utility classes on top without owning the markup.\n- `layout` — structural toggles (logo URL, social-buttons\n  placement, optional-field visibility, animation opt-out).\n\nEvery block is optional and partially-specified; SDKs treat\nmissing keys as \"use the default\".\n\n### ETag\n\nThe `/v1/environment` response wraps this shape with an `etag` so\nthe SDK can short-circuit re-renders when the config hasn't\nchanged. `etag = sha256(canonical-JSON(appearance))`.\n",
+        "additionalProperties": false,
+        "properties": {
+          "variables": {
+            "type": "object",
+            "description": "CSS design-token map applied as custom properties on the\ncomponent root. Every value is a free-form CSS string —\n`\"#0a84ff\"`, `\"rgb(10 132 255)\"`, `\"royalblue\"`, `\"1rem\"`,\n`\"system-ui, sans-serif\"` are all valid.\n",
+            "additionalProperties": false,
+            "properties": {
+              "colorPrimary": {
+                "type": "string",
+                "description": "Primary brand accent (buttons, focus rings, links)."
+              },
+              "colorBackground": {
+                "type": "string",
+                "description": "Card / surface background."
+              },
+              "colorText": {
+                "type": "string",
+                "description": "Default body text colour."
+              },
+              "colorTextOnPrimary": {
+                "type": "string",
+                "description": "Text colour rendered on top of `colorPrimary` (e.g. primary button labels)."
+              },
+              "colorInputBackground": {
+                "type": "string",
+                "description": "Form input background."
+              },
+              "colorInputText": {
+                "type": "string",
+                "description": "Form input text colour."
+              },
+              "colorDanger": {
+                "type": "string",
+                "description": "Destructive / error accent (delete buttons, validation errors)."
+              },
+              "colorSuccess": {
+                "type": "string",
+                "description": "Success accent (verified states, success banners)."
+              },
+              "colorWarning": {
+                "type": "string",
+                "description": "Warning accent (pending verification, caution banners)."
+              },
+              "colorNeutral": {
+                "type": "string",
+                "description": "Neutral accent (secondary buttons, muted text)."
+              },
+              "fontFamily": {
+                "type": "string",
+                "description": "Default font family for body copy."
+              },
+              "fontFamilyButtons": {
+                "type": "string",
+                "description": "Override for button typography. Falls back to `fontFamily`."
+              },
+              "fontSize": {
+                "type": "string",
+                "description": "Base font size (e.g. `\"14px\"`, `\"1rem\"`)."
+              },
+              "borderRadius": {
+                "type": "string",
+                "description": "Component corner radius."
+              },
+              "spacingUnit": {
+                "type": "string",
+                "description": "Spacing scale unit; multiplied for padding/gap."
+              }
+            }
+          },
+          "elements": {
+            "type": "object",
+            "description": "Per-element className override map. Keys are stable element\nnames exposed by the SDK; values are space-separated className\nstrings appended to the default class list. Unknown keys are\nignored.\n",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "properties": {
+              "formButtonPrimary": {
+                "type": "string"
+              },
+              "formButtonReset": {
+                "type": "string"
+              },
+              "formFieldInput": {
+                "type": "string"
+              },
+              "formFieldLabel": {
+                "type": "string"
+              },
+              "formFieldErrorText": {
+                "type": "string"
+              },
+              "card": {
+                "type": "string"
+              },
+              "headerTitle": {
+                "type": "string"
+              },
+              "headerSubtitle": {
+                "type": "string"
+              },
+              "dividerLine": {
+                "type": "string"
+              },
+              "dividerText": {
+                "type": "string"
+              },
+              "socialButtonsBlockButton": {
+                "type": "string"
+              },
+              "socialButtonsProviderIcon": {
+                "type": "string"
+              },
+              "footerActionLink": {
+                "type": "string"
+              },
+              "userPreviewMainIdentifier": {
+                "type": "string"
+              },
+              "userPreviewSecondaryIdentifier": {
+                "type": "string"
+              },
+              "userButtonAvatarBox": {
+                "type": "string"
+              },
+              "userButtonPopoverActionButton": {
+                "type": "string"
+              }
+            }
+          },
+          "layout": {
+            "type": "object",
+            "description": "Structural toggles applied to the component shell.",
+            "additionalProperties": false,
+            "properties": {
+              "logoImageUrl": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uri",
+                "description": "Image rendered above the card title. `null` to hide the\nlogo entirely (the operator's brand probably lives outside\nthe component).\n"
+              },
+              "logoLinkUrl": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uri",
+                "description": "Where the logo links to when clicked. Defaults to the\nenvironment `home_url`.\n"
+              },
+              "socialButtonsPlacement": {
+                "type": "string",
+                "enum": [
+                  "top",
+                  "bottom"
+                ],
+                "default": "top",
+                "description": "Render the OAuth provider buttons above (`top`) or below\n(`bottom`) the identifier form.\n"
+              },
+              "socialButtonsVariant": {
+                "type": "string",
+                "enum": [
+                  "blockButton",
+                  "iconButton"
+                ],
+                "default": "blockButton",
+                "description": "`blockButton` — labelled \"Continue with Google\" buttons\nstacked vertically. `iconButton` — icon-only buttons laid\nout horizontally.\n"
+              },
+              "showOptionalFields": {
+                "type": "boolean",
+                "default": true,
+                "description": "When `false`, fields the environment marks as `optional`\n(e.g. `first_name`, `last_name`) are hidden on the sign-up\nform.\n"
+              },
+              "privacyPageUrl": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uri",
+                "description": "Linked from the footer / sign-up legal copy."
+              },
+              "termsPageUrl": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uri",
+                "description": "Linked from the footer / sign-up legal copy."
+              },
+              "helpPageUrl": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "uri",
+                "description": "Linked from the help affordance in `<UserProfile />`."
+              },
+              "animations": {
+                "type": "boolean",
+                "default": true,
+                "description": "When `false`, the SDK uses `prefers-reduced-motion`-style\nstatic styling regardless of the user agent's setting.\nUseful for embedded contexts where animation chrome is\ndistracting.\n"
+              }
+            }
+          }
+        },
+        "examples": [
+          {},
+          {
+            "variables": {
+              "colorPrimary": "#0a84ff",
+              "colorTextOnPrimary": "#ffffff",
+              "borderRadius": "0.5rem"
+            },
+            "layout": {
+              "socialButtonsPlacement": "top",
+              "animations": true
+            }
+          },
+          {
+            "variables": {
+              "colorPrimary": "rgb(10 132 255)",
+              "colorBackground": "#0b1220",
+              "colorText": "#e6edf3",
+              "colorTextOnPrimary": "#ffffff",
+              "colorInputBackground": "#111827",
+              "colorInputText": "#e6edf3",
+              "colorDanger": "#f87171",
+              "colorSuccess": "#34d399",
+              "colorWarning": "#fbbf24",
+              "colorNeutral": "#9ca3af",
+              "fontFamily": "Inter, system-ui, sans-serif",
+              "fontFamilyButtons": "Inter, system-ui, sans-serif",
+              "fontSize": "14px",
+              "borderRadius": "0.5rem",
+              "spacingUnit": "0.25rem"
+            },
+            "elements": {
+              "card": "shadow-2xl border border-slate-700",
+              "formButtonPrimary": "tracking-wide uppercase",
+              "formFieldInput": "ring-1 ring-slate-700",
+              "headerTitle": "text-2xl",
+              "socialButtonsBlockButton": "border border-slate-700",
+              "footerActionLink": "text-sky-400"
+            },
+            "layout": {
+              "logoImageUrl": "https://cdn.acme.com/logo-dark.svg",
+              "logoLinkUrl": "https://acme.com",
+              "socialButtonsPlacement": "bottom",
+              "socialButtonsVariant": "blockButton",
+              "showOptionalFields": false,
+              "privacyPageUrl": "https://acme.com/privacy",
+              "termsPageUrl": "https://acme.com/terms",
+              "helpPageUrl": "https://acme.com/help",
+              "animations": true
+            }
+          }
+        ]
+      },
+      "Localization": {
+        "type": "object",
+        "description": "Per-environment localization configuration. Stores **overrides\nonly** — the canonical default catalog ships with `@authn-sh/sdk-react`\nand is merged in at render time. The render-time merge resolves\neach key as:\n\n```\ndefault_catalog[locale]\n  ⊕ overrides[locale]                  # operator's per-locale tweak\n  ⊕ default_catalog[fallback_locale]   # used for keys the active locale didn't translate\n  ⊕ overrides[fallback_locale]\n  ⊕ (per-key hard fallback, baked into the SDK)\n```\n\nv0.5 ships canonical catalogs for `en-US`, `pt-BR`, `es-ES`,\n`fr-FR`, `de-DE`. Operators add new locales by listing them in\n`supported_locales[]` and providing the catalog under\n`overrides[locale]` — the SDK refuses to surface a locale that\nisn't in `supported_locales[]`, even if a partial override exists.\n",
+        "required": [
+          "default_locale",
+          "fallback_locale",
+          "supported_locales",
+          "overrides"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "default_locale": {
+            "type": "string",
+            "description": "BCP-47 tag. Used when the SDK can't read a user preference (e.g.\nfirst paint, unauthenticated pages).\n",
+            "examples": [
+              "en-US",
+              "pt-BR"
+            ]
+          },
+          "fallback_locale": {
+            "type": "string",
+            "description": "BCP-47 tag the SDK falls back to per-key when the active locale\ndoesn't have a translation for a given key. Typically `en-US`.\n",
+            "examples": [
+              "en-US"
+            ]
+          },
+          "supported_locales": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Locales the SDK is allowed to surface in the language picker\nand to auto-detect from `Accept-Language`. Must include\n`default_locale` and `fallback_locale`. Locales not present in\nthe bundled default catalog must have a full override blob —\nthe BAPI `PATCH` validator returns `unsupported_locale` if a\ncaller adds an entry here without a matching default or\noverride.\n",
+            "examples": [
+              [
+                "en-US",
+                "pt-BR",
+                "es-ES"
+              ]
+            ]
+          },
+          "overrides": {
+            "type": "object",
+            "description": "Per-locale operator overrides. Outer key is a BCP-47 locale\ntag; inner map is dot-keyed canonical keys to translated\nstrings. Unknown keys are rejected by the BAPI validator with\n`unknown_localization_key`. Setting a key to `null` via\n`PATCH /v1/instance/localization` removes that single override\nwithout affecting the rest of the locale.\n",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Dot-keyed catalog. Keys mirror `sdk-react`'s canonical schema."
+            }
+          }
+        },
+        "examples": [
+          {
+            "default_locale": "en-US",
+            "fallback_locale": "en-US",
+            "supported_locales": [
+              "en-US",
+              "pt-BR",
+              "es-ES",
+              "fr-FR",
+              "de-DE"
+            ],
+            "overrides": {}
+          },
+          {
+            "default_locale": "en-US",
+            "fallback_locale": "en-US",
+            "supported_locales": [
+              "en-US",
+              "pt-BR"
+            ],
+            "overrides": {
+              "en-US": {
+                "signIn.start.title": "Welcome to Acme",
+                "signIn.start.subtitle": "Sign in to continue to your dashboard."
+              }
+            }
+          },
+          {
+            "default_locale": "pt-BR",
+            "fallback_locale": "en-US",
+            "supported_locales": [
+              "en-US",
+              "pt-BR"
+            ],
+            "overrides": {
+              "pt-BR": {
+                "signIn.start.title": "Bem-vindo de volta",
+                "signIn.start.actionText": "Não tem uma conta?",
+                "signIn.start.actionLink": "Criar conta"
+              }
+            }
+          }
+        ]
+      },
+      "LocalizationUpdateRequest": {
+        "type": "object",
+        "description": "Body for `PATCH /v1/instance/localization`. Every field is optional.\n\n- `default_locale` / `fallback_locale` — scalar replace when supplied.\n- `supported_locales[]` — full-array replace when supplied.\n- `overrides[locale]` — per-key merge. The inner map merges\n  key-by-key into the existing locale's overrides; sending a\n  string overwrites that key, sending `null` removes it (the SDK\n  falls back to the canonical default). Unknown dot-keyed paths\n  are rejected with `unknown_localization_key`.\n",
+        "additionalProperties": false,
+        "properties": {
+          "default_locale": {
+            "type": "string"
+          },
+          "fallback_locale": {
+            "type": "string"
+          },
+          "supported_locales": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "overrides": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      },
       "AttributeSetting": {
         "type": "object",
         "description": "Per-attribute policy embedded in `InstanceSettings.attribute_settings`.\n`verifications[]` lists the strategies the environment will accept\nfor this attribute (e.g. `[\"email_code\"]`).\n",
@@ -8589,7 +10381,7 @@
           },
           "type": {
             "type": "string",
-            "description": "Stable event type identifier. v0.1 shipped the `user.*`,\n`session.*`, `email.*`, and `invitation.*` events. v0.2 adds the\norganization, role, and permission events. v0.4 adds the\nsocial-IdP, external-account, and phone-number events.\n\nFuture surfaces (enterprise SSO, SCIM) will be added additively\nunder their own milestones.\n",
+            "description": "Stable event type identifier. v0.1 shipped the `user.*`,\n`session.*`, `email.*`, and `invitation.*` events. v0.2 adds the\norganization, role, and permission events. v0.4 adds the\nsocial-IdP, external-account, and phone-number events. v0.5\nadds passkey lifecycle, the appearance-config update event,\nand the localization-config update event. v0.6 adds the\nenterprise-SSO + SCIM events.\n",
             "enum": [
               "user.created",
               "user.updated",
@@ -8631,11 +10423,24 @@
               "externalAccount.unlinked",
               "phoneNumber.created",
               "phoneNumber.verified",
-              "phoneNumber.removed"
+              "phoneNumber.removed",
+              "passkey.added",
+              "passkey.removed",
+              "instance.config.appearance_updated",
+              "localization.updated",
+              "enterpriseConnection.created",
+              "enterpriseConnection.updated",
+              "enterpriseConnection.deleted",
+              "enterpriseAccount.connected",
+              "enterpriseAccount.unlinked",
+              "scimToken.issued",
+              "scimToken.revoked",
+              "scimUser.provisioned",
+              "scimUser.deprovisioned"
             ]
           },
           "data": {
-            "description": "The resource snapshot. Concrete shape depends on `type`:\n\n- `user.*` → `User`\n- `session.*` → `Session`\n- `email.*` → `EmailAddress`\n- `invitation.*` → `Invitation`\n- `organization.*` → `Organization`\n- `organizationMembership.*` → `OrganizationMembership` (with\n  populated `public_user_data`, so handlers don't need a\n  follow-up `getUser`)\n- `organizationInvitation.*` → `OrganizationInvitation`\n- `organizationDomain.*` → `OrganizationDomain`\n- `organizationMembershipRequest.*` → `OrganizationMembershipRequest`\n- `role.*` → `Role`\n- `permission.*` → `Permission` (custom permissions only —\n  system permissions are seeded and don't emit lifecycle events)\n- `oauthProvider.*` → `OauthProvider` (`client_secret` is never\n  in the payload — encrypted at rest, write-only)\n- `externalAccount.*` → `ExternalAccount` (the IdP-issued\n  `access_token` / `refresh_token` / `id_token` are never in the\n  payload either)\n- `phoneNumber.*` → `PhoneNumber`\n",
+            "description": "The resource snapshot. Concrete shape depends on `type`:\n\n- `user.*` → `User`\n- `session.*` → `Session`\n- `email.*` → `EmailAddress`\n- `invitation.*` → `Invitation`\n- `organization.*` → `Organization`\n- `organizationMembership.*` → `OrganizationMembership` (with\n  populated `public_user_data`, so handlers don't need a\n  follow-up `getUser`)\n- `organizationInvitation.*` → `OrganizationInvitation`\n- `organizationDomain.*` → `OrganizationDomain`\n- `organizationMembershipRequest.*` → `OrganizationMembershipRequest`\n- `role.*` → `Role`\n- `permission.*` → `Permission` (custom permissions only —\n  system permissions are seeded and don't emit lifecycle events)\n- `oauthProvider.*` → `OauthProvider` (`client_secret` is never\n  in the payload — encrypted at rest, write-only)\n- `externalAccount.*` → `ExternalAccount` (the IdP-issued\n  `access_token` / `refresh_token` / `id_token` are never in the\n  payload either)\n- `phoneNumber.*` → `PhoneNumber`\n- `passkey.*` → `Passkey`\n- `enterpriseConnection.*` → `EnterpriseConnection`\n  (`oidc_client_secret` and `saml_signing_key` are never in the\n  payload — encrypted at rest, write-only)\n- `enterpriseAccount.*` → `EnterpriseAccount`\n- `scimToken.*` → `ScimToken` (plaintext `token` is never in\n  the payload — `writeOnly: true`, returned only on the\n  single-shot issue response)\n- `scimUser.*` →\n  `{ user: User, enterprise_connection_id, organization_id }`\n  (carries the connection that drove provisioning + the\n  scoping org so handlers can route without a follow-up\n  lookup)\n- `instance.config.appearance_updated` →\n  `{ previous: Appearance, current: Appearance,\n     diff: Appearance }`. `diff` is the partial-shape blob\n  the operator's `PATCH /v1/instance/appearance` request body\n  carried (or the full new shape on a `PUT`).\n- `localization.updated` →\n  `{ previous: Localization, current: Localization,\n     diff: LocalizationUpdateRequest }`. `diff` is the partial\n  the operator submitted via `PATCH /v1/instance/localization`\n  (or the full new shape on a `PUT`).\n",
             "oneOf": [
               {
                 "$ref": "#/components/schemas/User"
@@ -8678,6 +10483,90 @@
               },
               {
                 "$ref": "#/components/schemas/PhoneNumber"
+              },
+              {
+                "$ref": "#/components/schemas/Passkey"
+              },
+              {
+                "$ref": "#/components/schemas/EnterpriseConnection"
+              },
+              {
+                "$ref": "#/components/schemas/EnterpriseAccount"
+              },
+              {
+                "$ref": "#/components/schemas/ScimToken"
+              },
+              {
+                "type": "object",
+                "description": "`scimUser.*` payload.\n",
+                "required": [
+                  "user",
+                  "enterprise_connection_id",
+                  "organization_id"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "user": {
+                    "$ref": "#/components/schemas/User"
+                  },
+                  "enterprise_connection_id": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/Id"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Source connection. `null` for SCIM-only provisioning\nwhen no `EnterpriseConnection` was involved (token\nissued for direct directory sync against a workspace\nIdP that doesn't drive SSO).\n"
+                  },
+                  "organization_id": {
+                    "$ref": "#/components/schemas/Id",
+                    "description": "Scoping organization."
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "description": "`instance.config.appearance_updated` payload.\n",
+                "required": [
+                  "previous",
+                  "current",
+                  "diff"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "previous": {
+                    "$ref": "#/components/schemas/Appearance"
+                  },
+                  "current": {
+                    "$ref": "#/components/schemas/Appearance"
+                  },
+                  "diff": {
+                    "$ref": "#/components/schemas/Appearance"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "description": "`localization.updated` payload.\n",
+                "required": [
+                  "previous",
+                  "current",
+                  "diff"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "previous": {
+                    "$ref": "#/components/schemas/Localization"
+                  },
+                  "current": {
+                    "$ref": "#/components/schemas/Localization"
+                  },
+                  "diff": {
+                    "$ref": "#/components/schemas/LocalizationUpdateRequest"
+                  }
+                }
               }
             ]
           },
@@ -8929,6 +10818,242 @@
               "is_system": false,
               "created_at": 1714897200000,
               "updated_at": 1714897200000
+            }
+          },
+          {
+            "id": "whd_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+            "object": "event",
+            "type": "passkey.added",
+            "timestamp": 1714897400000,
+            "instance_id": "env_acme_test",
+            "was_test": false,
+            "data": {
+              "id": "pkey_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+              "object": "passkey",
+              "nickname": "YubiKey 5C",
+              "transports": [
+                "usb",
+                "nfc"
+              ],
+              "aaguid": "ee882879-721c-4913-9775-3dfcce97072a",
+              "verified": true,
+              "last_used_at": null,
+              "created_at": 1714897400000,
+              "updated_at": 1714897400000
+            }
+          },
+          {
+            "id": "whd_01HKX9SY9V7H7TF8C8K7J9X4ZB",
+            "object": "event",
+            "type": "passkey.removed",
+            "timestamp": 1714897500000,
+            "instance_id": "env_acme_test",
+            "was_test": false,
+            "data": {
+              "id": "pkey_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+              "object": "passkey",
+              "nickname": "YubiKey 5C",
+              "transports": [
+                "usb",
+                "nfc"
+              ],
+              "aaguid": "ee882879-721c-4913-9775-3dfcce97072a",
+              "verified": true,
+              "last_used_at": 1714897450000,
+              "created_at": 1714897400000,
+              "updated_at": 1714897500000
+            }
+          },
+          {
+            "id": "whd_01HKX9SY9V7H7TF8C8K7J9X4ZC",
+            "object": "event",
+            "type": "instance.config.appearance_updated",
+            "timestamp": 1714897600000,
+            "instance_id": "env_acme_test",
+            "was_test": false,
+            "data": {
+              "previous": {},
+              "current": {
+                "variables": {
+                  "colorPrimary": "#0a84ff",
+                  "colorTextOnPrimary": "#ffffff"
+                }
+              },
+              "diff": {
+                "variables": {
+                  "colorPrimary": "#0a84ff",
+                  "colorTextOnPrimary": "#ffffff"
+                }
+              }
+            }
+          },
+          {
+            "id": "whd_01HKX9SY9V7H7TF8C8K7J9X4ZD",
+            "object": "event",
+            "type": "localization.updated",
+            "timestamp": 1714897700000,
+            "instance_id": "env_acme_test",
+            "was_test": false,
+            "data": {
+              "previous": {
+                "default_locale": "en-US",
+                "fallback_locale": "en-US",
+                "supported_locales": [
+                  "en-US",
+                  "pt-BR"
+                ],
+                "overrides": {}
+              },
+              "current": {
+                "default_locale": "en-US",
+                "fallback_locale": "en-US",
+                "supported_locales": [
+                  "en-US",
+                  "pt-BR"
+                ],
+                "overrides": {
+                  "pt-BR": {
+                    "signIn.start.title": "Bem-vindo de volta"
+                  }
+                }
+              },
+              "diff": {
+                "overrides": {
+                  "pt-BR": {
+                    "signIn.start.title": "Bem-vindo de volta"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "id": "whd_01HKX9SY9V7H7TF8C8K7J9X4ZE",
+            "object": "event",
+            "type": "enterpriseConnection.created",
+            "timestamp": 1714897800000,
+            "instance_id": "env_acme_test",
+            "was_test": false,
+            "data": {
+              "id": "entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+              "object": "enterprise_connection",
+              "protocol": "saml",
+              "name": "Acme Okta",
+              "enabled": true,
+              "organization_id": "org_01HKX9SY9V7H7TF8C8K7J9X4ZH",
+              "domains": [
+                "acme.com"
+              ],
+              "default_role": "org:member",
+              "attribute_mapping": {
+                "email_address": "urn:oid:0.9.2342.19200300.100.1.3",
+                "first_name": "urn:oid:2.5.4.42",
+                "last_name": "urn:oid:2.5.4.4",
+                "provider_user_id": "nameid"
+              },
+              "saml_idp_entity_id": "https://idp.acme.example/saml/metadata",
+              "saml_sso_url": "https://idp.acme.example/saml/sso",
+              "saml_idp_certificate": "-----BEGIN CERTIFICATE-----\nMIID...\n-----END CERTIFICATE-----",
+              "saml_signing_algorithm": "RSA_SHA256",
+              "saml_audience_uri": "https://acme.authn.sh/v1/saml/entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA/metadata",
+              "saml_acs_url": "https://acme.authn.sh/v1/saml/entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA/acs",
+              "saml_sp_entity_id": "https://acme.authn.sh/v1/saml/entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA/metadata",
+              "oidc_issuer": null,
+              "oidc_discovery_endpoint": null,
+              "oidc_client_id": null,
+              "oidc_scopes": [],
+              "oidc_redirect_uri": null,
+              "created_at": 1714897800000,
+              "updated_at": 1714897800000
+            }
+          },
+          {
+            "id": "whd_01HKX9SY9V7H7TF8C8K7J9X4ZF",
+            "object": "event",
+            "type": "enterpriseAccount.connected",
+            "timestamp": 1714897900000,
+            "instance_id": "env_acme_test",
+            "was_test": false,
+            "data": {
+              "id": "entacc_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+              "object": "enterprise_account",
+              "enterprise_connection_id": "entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+              "provider_user_id": "alice@acme.example",
+              "email_address": "alice@acme.example",
+              "verified": true,
+              "public_metadata": {
+                "groups": [
+                  "engineering"
+                ]
+              },
+              "linked_at": 1714897900000,
+              "last_signed_in_at": null,
+              "created_at": 1714897900000,
+              "updated_at": 1714897900000
+            }
+          },
+          {
+            "id": "whd_01HKX9SY9V7H7TF8C8K7J9X4ZG",
+            "object": "event",
+            "type": "scimToken.issued",
+            "timestamp": 1714898000000,
+            "instance_id": "env_acme_test",
+            "was_test": false,
+            "data": {
+              "id": "scimt_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+              "object": "scim_token",
+              "organization_id": "org_01HKX9SY9V7H7TF8C8K7J9X4ZH",
+              "name": "Okta — Production",
+              "prefix": "scim_01HKX9SY",
+              "created_at": 1714898000000,
+              "revoked_at": null
+            }
+          },
+          {
+            "id": "whd_01HKX9SY9V7H7TF8C8K7J9X4ZH",
+            "object": "event",
+            "type": "scimUser.provisioned",
+            "timestamp": 1714898100000,
+            "instance_id": "env_acme_test",
+            "was_test": false,
+            "data": {
+              "enterprise_connection_id": "entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+              "organization_id": "org_01HKX9SY9V7H7TF8C8K7J9X4ZH",
+              "user": {
+                "id": "user_01HKX9SY9V7H7TF8C8K7J9X4ZB",
+                "object": "user",
+                "external_id": "00uabcdEFGHIJKLM2x7",
+                "username": null,
+                "first_name": "Alice",
+                "last_name": "Anderson",
+                "image_url": null,
+                "has_image": false,
+                "primary_email_address_id": "idn_01HKX9SY9V7H7TF8C8K7J9X4ZE",
+                "primary_phone_number_id": null,
+                "email_addresses": [],
+                "phone_numbers": [],
+                "external_accounts": [],
+                "enterprise_accounts": [],
+                "passkeys": [],
+                "passkey_count": 0,
+                "password_enabled": false,
+                "two_factor_enabled": false,
+                "totp_enabled": false,
+                "backup_code_enabled": false,
+                "mfa_enabled_at": null,
+                "mfa_disabled_at": null,
+                "banned": false,
+                "locked": false,
+                "lockout_expires_at": null,
+                "last_sign_in_at": null,
+                "last_active_at": null,
+                "delete_self_enabled": true,
+                "locale": null,
+                "public_metadata": {},
+                "private_metadata": {},
+                "unsafe_metadata": {},
+                "created_at": 1714898100000,
+                "updated_at": 1714898100000
+              }
             }
           },
           {
@@ -9678,7 +11803,7 @@
       },
       "OrganizationDomain": {
         "type": "object",
-        "description": "A domain attached to an `Organization`. Once verified, drives\ndomain-based enrollment — depending on `enrollment_mode`, sign-ups\nwith a matching email get an automatic invitation, an automatic\nmembership-request suggestion, or nothing at all.\n\nVerification runs through a `Challenge` against\n`/v1/organizations/{org}/domains/{id}/challenges`. The proof channel\n(DNS TXT or email-to-`affiliation_email_address`) is selected by the\nchallenge's `strategy` (`domain_dns_txt` or `email_code`).\n",
+        "description": "A domain attached to an `Organization`. Once verified, drives\ndomain-based enrollment and (v0.6+) enterprise-SSO routing.\n\n### Enrollment vs SSO routing\n\nThe two behaviours are independent and can stack:\n\n- **Enrollment** (`enrollment_mode`) controls what happens to a\n  user whose sign-up email matches the domain. Three modes: no-op,\n  auto-invitation, auto-suggestion.\n- **SSO routing** (v0.6) — separately, when the org has at least\n  one verified `EnterpriseConnection` whose `domains[]` includes\n  this row's `name`, a sign-in whose identifier domain matches is\n  routed to that connection. The server narrows the resolved\n  `SignIn.supported_strategies` to `[\"enterprise_sso\"]` and\n  populates `SignIn.enterprise_connection_id`. Ambiguous matches\n  (multiple connections claim the same domain) surface all\n  options on the SignIn so the SDK can prompt; see OA-3 errors\n  `enterprise_sso_no_connection` /\n  `enterprise_sso_multiple_connections`.\n\nVerification runs through a `Challenge` against\n`/v1/organizations/{org}/domains/{id}/challenges`. The proof channel\n(DNS TXT or email-to-`affiliation_email_address`) is selected by the\nchallenge's `strategy` (`domain_dns_txt` or `email_code`).\n",
         "required": [
           "id",
           "object",
@@ -9732,7 +11857,7 @@
               "automatic_invitation",
               "automatic_suggestion"
             ],
-            "description": "- `manual_invitation` — domain match has no effect on sign-up;\n  members must be invited explicitly.\n- `automatic_invitation` — sign-ups with a matching email\n  skip the invitation step and join as `default_role`.\n- `automatic_suggestion` — sign-ups with a matching email get\n  an `OrganizationMembershipRequest` row that an admin must\n  approve.\n"
+            "description": "Gates the post-sign-up enrollment side-effect for matches on\nthis domain. Independent of enterprise-SSO routing — that's\ndriven by `EnterpriseConnection.domains[]` and applies at\nsign-in time, not sign-up.\n\n- `manual_invitation` — domain match grants no membership on\n  sign-up. Members must be invited explicitly via\n  `OrganizationInvitation`. For sign-ins routed through an\n  enterprise connection (v0.6), the resulting `User` still\n  lands without an `OrganizationMembership` in this mode —\n  the connection's `default_role` is ignored.\n- `automatic_invitation` — first sign-up under this domain\n  auto-creates an `OrganizationInvitation` that immediately\n  resolves to an `OrganizationMembership` at the org's\n  default role. For enterprise-SSO sign-ins, the JIT-\n  provisioned membership uses the connection's `default_role`.\n- `automatic_suggestion` — sign-ups with a matching email get\n  an `OrganizationMembershipRequest` row that an admin must\n  approve via `POST .../membership-requests/{id}/accept`.\n  For enterprise-SSO sign-ins, the membership request is\n  still minted (admin approval is required even though the\n  IdP asserted the identity).\n"
           },
           "affiliation_email_address": {
             "type": [
@@ -10074,7 +12199,7 @@
       },
       "OauthProvider": {
         "type": "object",
-        "description": "Per-environment social-IdP configuration. The SDK reads `OauthProvider`\nrows to render `<SocialButtons />`; the server reads them to drive the\n`oauth_<provider_key>` first-factor `Challenge` strategy. Three kinds\nshare a single shape:\n\n- `preset` — bundled IdPs the platform ships with (`google`, `github`,\n  `apple`, `microsoft`). The OIDC discovery fields and default scope\n  set are filled in by the platform on create; the operator only\n  supplies `client_id`, `client_secret`, and any toggles\n  (`enabled`, `allow_sign_in`, …).\n- `custom_oidc` — workspace-registered OpenID Connect IdP. The\n  operator supplies an `issuer` URL; the server fetches and caches\n  `<issuer>/.well-known/openid-configuration` and populates the OIDC\n  endpoint fields automatically. `discovery_endpoint`,\n  `authorization_endpoint`, `token_endpoint`, `userinfo_endpoint`,\n  `jwks_uri`, `id_token_signing_algs[]` are read-only when populated\n  by discovery, but admin-overridable for self-host edge cases where\n  discovery is unreachable.\n- `custom_oauth2` — workspace-registered plain OAuth 2.0 IdP without\n  OIDC. The operator supplies `authorization_endpoint`,\n  `token_endpoint`, and `userinfo_endpoint` directly, plus\n  `userinfo_method` (`GET` / `POST`) and `userinfo_auth` (`bearer` /\n  `basic` / `query`) so the server knows how to call the userinfo\n  endpoint.\n\n### Secret handling\n\n`client_secret` is **write-only**. It's accepted on\n`POST /v1/oauth-providers` and `PATCH /v1/oauth-providers/{id}` (see\n`OauthProviderRequest`), encrypted at rest, and never returned in any\nresponse. The public payload exposes `client_id` only.\n\n### Computed redirect_uri\n\n`redirect_uri` is computed server-side as\n`https://<env_slug>.authn.sh/v1/oauth-callback/<provider_key>` and is\nread-only. It's the value the operator must register with the IdP.\n\n### attribute_mapping\n\nMap of authn.sh `User` / `ExternalAccount` fields to IdP claim or\nuserinfo paths. Presets ship with sensible defaults\n(`email_address` → `email`, `first_name` → `given_name`,\n`last_name` → `family_name`, …); operators can override per row to\nmatch a non-standard IdP.\n\n### Identifier\n\nID prefix `oauthp_` (e.g. `oauthp_01HKX9SY9V7H7TF8C8K7J9X4ZA`).\n",
+        "description": "Per-environment social-IdP configuration. The SDK reads `OauthProvider`\nrows to render `<SocialButtons />`; the server reads them to drive the\n`oauth_<provider_key>` first-factor `Challenge` strategy. Three kinds\nshare a single shape:\n\n- `preset` — bundled IdPs the platform ships with. v0.4 ships\n  `google`, `github`, `apple`, `microsoft`; v0.5 adds `discord`,\n  `facebook`, `linkedin`, `x`, `gitlab`, `slack`. The OIDC\n  discovery fields and default scope set are filled in by the\n  platform on create; the operator only supplies `client_id`,\n  `client_secret`, and any toggles (`enabled`, `allow_sign_in`,\n  …).\n\n  Per-preset defaults:\n\n  - **Google** — OIDC discovery at\n    `https://accounts.google.com/.well-known/openid-configuration`.\n    Default scopes `[openid, email, profile]`.\n  - **GitHub** — Plain OAuth 2.0 (GitHub doesn't expose OIDC\n    discovery). Default scopes `[read:user, user:email]`.\n  - **Apple** — OIDC discovery at\n    `https://appleid.apple.com/.well-known/openid-configuration`.\n    Default scopes `[name, email]`.\n  - **Microsoft** — OIDC discovery at\n    `https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration`.\n    Default scopes `[openid, email, profile]`.\n  - **Discord** — Plain OAuth 2.0 (Discord doesn't expose OIDC\n    discovery). Default scopes `[identify, email]`.\n  - **Facebook** — Plain OAuth 2.0 with custom userinfo semantics\n    (the userinfo endpoint requires the `fields` query param to\n    surface email + name). Default scopes\n    `[public_profile, email]`.\n  - **LinkedIn** — OIDC discovery at\n    `https://www.linkedin.com/oauth/.well-known/openid-configuration`.\n    Default scopes `[openid, profile, email]`.\n  - **X** (formerly Twitter) — OAuth 2.0 with PKCE required.\n    Default scopes `[tweet.read, users.read]`.\n  - **GitLab** — OIDC discovery at\n    `https://gitlab.com/.well-known/openid-configuration`. Default\n    scopes `[openid, profile, email]`.\n  - **Slack** — \"Sign in with Slack\" OIDC discovery at\n    `https://slack.com/.well-known/openid-configuration`. Default\n    scopes `[openid, profile, email]`.\n- `custom_oidc` — workspace-registered OpenID Connect IdP. The\n  operator supplies an `issuer` URL; the server fetches and caches\n  `<issuer>/.well-known/openid-configuration` and populates the OIDC\n  endpoint fields automatically. `discovery_endpoint`,\n  `authorization_endpoint`, `token_endpoint`, `userinfo_endpoint`,\n  `jwks_uri`, `id_token_signing_algs[]` are read-only when populated\n  by discovery, but admin-overridable for self-host edge cases where\n  discovery is unreachable.\n- `custom_oauth2` — workspace-registered plain OAuth 2.0 IdP without\n  OIDC. The operator supplies `authorization_endpoint`,\n  `token_endpoint`, and `userinfo_endpoint` directly, plus\n  `userinfo_method` (`GET` / `POST`) and `userinfo_auth` (`bearer` /\n  `basic` / `query`) so the server knows how to call the userinfo\n  endpoint.\n\n### Secret handling\n\n`client_secret` is **write-only**. It's accepted on\n`POST /v1/oauth-providers` and `PATCH /v1/oauth-providers/{id}` (see\n`OauthProviderRequest`), encrypted at rest, and never returned in any\nresponse. The public payload exposes `client_id` only.\n\n### Computed redirect_uri\n\n`redirect_uri` is computed server-side as\n`https://<env_slug>.authn.sh/v1/oauth-callback/<provider_key>` and is\nread-only. It's the value the operator must register with the IdP.\n\n### attribute_mapping\n\nMap of authn.sh `User` / `ExternalAccount` fields to IdP claim or\nuserinfo paths. Presets ship with sensible defaults\n(`email_address` → `email`, `first_name` → `given_name`,\n`last_name` → `family_name`, …); operators can override per row to\nmatch a non-standard IdP.\n\n### Identifier\n\nID prefix `oauthp_` (e.g. `oauthp_01HKX9SY9V7H7TF8C8K7J9X4ZA`).\n",
         "required": [
           "id",
           "object",
@@ -10115,12 +12240,18 @@
             "type": "string",
             "pattern": "^[a-z][a-z0-9_]*$",
             "maxLength": 64,
-            "description": "Stable slug used in the `oauth_<provider_key>` `Challenge.strategy`\nand in the computed `redirect_uri`. For `provider_kind: \"preset\"`\nthis is one of the bundled values (`google`, `github`, `apple`,\n`microsoft`). For `custom_oidc` / `custom_oauth2` it's a\nworkspace-chosen slug, unique per environment.\n",
+            "description": "Stable slug used in the `oauth_<provider_key>` `Challenge.strategy`\nand in the computed `redirect_uri`. For `provider_kind: \"preset\"`\nthis is one of the bundled values (`google`, `github`, `apple`,\n`microsoft`, `discord`, `facebook`, `linkedin`, `x`, `gitlab`,\n`slack`). For `custom_oidc` / `custom_oauth2` it's a\nworkspace-chosen slug, unique per environment.\n",
             "examples": [
               "google",
               "github",
               "apple",
               "microsoft",
+              "discord",
+              "facebook",
+              "linkedin",
+              "x",
+              "gitlab",
+              "slack",
               "acme_corp_sso"
             ]
           },
@@ -10662,6 +12793,723 @@
           }
         ]
       },
+      "EnterpriseConnection": {
+        "type": "object",
+        "description": "Per-environment Enterprise SSO IdP. One row carries either a SAML 2.0\nor an OIDC connection — consumers branch on `protocol`. Connections are\neither **instance-wide** (`organization_id: null`) — usable by any user\nin the environment whose email matches one of the connection's verified\n`domains` — or **org-scoped** (`organization_id` set) — usable only by\nmembers of that organization.\n\n### Discovery and routing\n\nA `SignIn` enters the enterprise-SSO path when the resolved identifier's\ndomain matches a verified `OrganizationDomain` whose connection mode\nselects SSO (see OA-6), or when the SDK explicitly requests the\n`enterprise_sso` / `saml` strategy with a `connection_id`. The server\nresolves the right `EnterpriseConnection` and surfaces the IdP redirect\non the resulting `Challenge` (`external_verification_redirect_url`).\n\n### Computed read-only fields\n\nTwo URLs are computed server-side from the connection `id` and the\nenvironment slug; operators register them with the IdP:\n\n- `saml_acs_url` — SAML AssertionConsumerService URL. Format:\n  `https://<env_slug>.authn.sh/v1/saml/<id>/acs`. Per-connection so the\n  server can dispatch the inbound assertion to the right row.\n- `saml_sp_entity_id` — SP entity identifier the IdP sees. Stable per\n  connection. Format: `https://<env_slug>.authn.sh/v1/saml/<id>/metadata`.\n- `oidc_redirect_uri` — OIDC redirect URI. Format:\n  `https://<env_slug>.authn.sh/v1/enterprise-sso-callback`.\n  Shared across OIDC connections — the server identifies the connection\n  via the OAuth `state` parameter.\n\n### Secret handling\n\n`oidc_client_secret` and `saml_signing_key` are **write-only**. Accepted\non `POST` / `PATCH` (see `EnterpriseConnectionRequest`), encrypted at\nrest, and never returned by any GET. The public shape carries only the\nIdP-supplied public material (`oidc_client_id`, `saml_idp_certificate`).\n\n### Attribute mapping\n\nMap of authn.sh field names (keys) to IdP claim / SAML attribute paths\n(values). Standard keys: `email_address`, `first_name`, `last_name`,\n`provider_user_id`, plus `organization_role` (maps to the\n`OrganizationMembership.role` to assign on JIT provisioning when the\nconnection is org-scoped). Sensible defaults are filled in by the\nserver when the operator omits the field on create.\n\n### Identifier\n\nID prefix `entcon_` (e.g. `entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA`).\n",
+        "required": [
+          "id",
+          "object",
+          "protocol",
+          "name",
+          "enabled",
+          "organization_id",
+          "domains",
+          "default_role",
+          "attribute_mapping",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "object": {
+            "type": "string",
+            "const": "enterprise_connection"
+          },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "saml",
+              "oidc"
+            ],
+            "description": "Which IdP protocol this connection speaks. Immutable after create\n— switching protocols means deleting the row and creating a new\none so the IdP-side registration starts clean.\n"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Human-readable label rendered in the Account Portal and on\n`<SignIn />` when more than one enterprise connection is offered.\n"
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "When `false`, the connection is hidden from sign-in routing and\nthe `enterprise_sso` / `saml` strategy is rejected for it.\nExisting `EnterpriseAccount` links survive the toggle.\n"
+          },
+          "organization_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`null` for instance-wide connections (any user in the env whose\nemail matches a verified `domain` can use it). Set to an\n`Organization.id` to scope the connection to that organization's\nmembers. Immutable after create.\n"
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "hostname"
+            },
+            "description": "Verified email domains routed to this connection. Each entry must\nmatch a verified `OrganizationDomain` (org-scoped connections) or\na workspace-verified domain (instance-wide connections). Empty\narray is legal — the connection is then reachable only via\nexplicit `connection_id` on the SignIn.\n",
+            "examples": [
+              [
+                "acme.example",
+                "acme-corp.example"
+              ]
+            ]
+          },
+          "default_role": {
+            "type": "string",
+            "description": "`Role.key` (e.g. `org:member`) assigned to the\n`OrganizationMembership` minted on JIT provisioning when this\nconnection is org-scoped. Ignored for instance-wide connections.\nDefaults to `org:member` on create.\n",
+            "examples": [
+              "org:member",
+              "org:admin"
+            ]
+          },
+          "attribute_mapping": {
+            "type": "object",
+            "description": "Map of authn.sh field names (keys) to IdP claim / SAML attribute\npaths (values). Keys: `email_address`, `first_name`, `last_name`,\n`provider_user_id`, `organization_role`. Defaults are filled in\nby the server (`email_address` → `email` for OIDC,\n`email_address` → `urn:oid:0.9.2342.19200300.100.1.3` for SAML;\netc.).\n",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "examples": [
+              {
+                "email_address": "email",
+                "first_name": "given_name",
+                "last_name": "family_name",
+                "provider_user_id": "sub"
+              },
+              {
+                "email_address": "urn:oid:0.9.2342.19200300.100.1.3",
+                "first_name": "urn:oid:2.5.4.42",
+                "last_name": "urn:oid:2.5.4.4",
+                "provider_user_id": "nameid"
+              }
+            ]
+          },
+          "saml_idp_entity_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "SAML EntityID the IdP publishes for itself. Required when\n`protocol: \"saml\"`; `null` for OIDC.\n",
+            "examples": [
+              "https://idp.acme.example/saml/metadata"
+            ]
+          },
+          "saml_sso_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "SAML SingleSignOnService URL the SDK redirects the browser to.\nRequired when `protocol: \"saml\"`; `null` for OIDC.\n",
+            "examples": [
+              "https://idp.acme.example/saml/sso"
+            ]
+          },
+          "saml_idp_certificate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "PEM-encoded X.509 certificate the IdP uses to sign SAML assertions.\nThe server verifies inbound assertions against this. Required when\n`protocol: \"saml\"`; `null` for OIDC.\n",
+            "examples": [
+              "-----BEGIN CERTIFICATE-----\nMIID...\n-----END CERTIFICATE-----"
+            ]
+          },
+          "saml_signing_algorithm": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "RSA_SHA256",
+              "RSA_SHA384",
+              "RSA_SHA512",
+              null
+            ],
+            "description": "Signature algorithm for assertions. Defaults to `RSA_SHA256` on\ncreate when `protocol: \"saml\"`. `null` for OIDC.\n"
+          },
+          "saml_audience_uri": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`Audience` URI the IdP must include in the SAML assertion.\nDefaults to `saml_sp_entity_id` on create when `protocol: \"saml\"`;\noperators can override for IdPs that pin audience to a custom URI.\n`null` for OIDC.\n"
+          },
+          "saml_acs_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "description": "Server-computed AssertionConsumerService URL. Format:\n`https://<env_slug>.authn.sh/v1/saml/<id>/acs`. Operators register\nthis exact value with the IdP. `null` for OIDC.\n",
+            "examples": [
+              "https://acme.authn.sh/v1/saml/entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA/acs"
+            ]
+          },
+          "saml_sp_entity_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "description": "Server-computed SP EntityID. Format:\n`https://<env_slug>.authn.sh/v1/saml/<id>/metadata`. This URL also\nserves SP metadata XML. `null` for OIDC.\n",
+            "examples": [
+              "https://acme.authn.sh/v1/saml/entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA/metadata"
+            ]
+          },
+          "oidc_issuer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "OIDC issuer URL the server runs discovery from. Required when\n`protocol: \"oidc\"`; `null` for SAML.\n",
+            "examples": [
+              "https://idp.acme.example"
+            ]
+          },
+          "oidc_discovery_endpoint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "Resolved discovery document URL. Populated by the server from\n`oidc_issuer` (`<issuer>/.well-known/openid-configuration`);\nadmin-overridable for non-standard discovery paths. `null` for\nSAML.\n"
+          },
+          "oidc_client_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "OIDC client identifier issued by the IdP. Required when\n`protocol: \"oidc\"`; `null` for SAML.\n",
+            "examples": [
+              "authn-acme-prod"
+            ]
+          },
+          "oidc_scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Scope set requested on the `/authorize` redirect. Defaults to\n`[\"openid\", \"profile\", \"email\"]` on create when `protocol: \"oidc\"`.\nEmpty for SAML connections.\n",
+            "examples": [
+              [
+                "openid",
+                "profile",
+                "email"
+              ],
+              [
+                "openid",
+                "profile",
+                "email",
+                "groups"
+              ]
+            ]
+          },
+          "oidc_redirect_uri": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "readOnly": true,
+            "description": "Server-computed OIDC redirect URI. Format:\n`https://<env_slug>.authn.sh/v1/enterprise-sso-callback`. Shared\nacross the env's OIDC enterprise connections — the server\nidentifies the connection via the OAuth `state` parameter.\nOperators register this exact value with the IdP. `null` for SAML.\n",
+            "examples": [
+              "https://acme.authn.sh/v1/enterprise-sso-callback"
+            ]
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "examples": [
+          {
+            "id": "entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+            "object": "enterprise_connection",
+            "protocol": "saml",
+            "name": "Acme Okta",
+            "enabled": true,
+            "organization_id": "org_01HKX9SY9V7H7TF8C8K7J9X4ZB",
+            "domains": [
+              "acme.example"
+            ],
+            "default_role": "org:member",
+            "attribute_mapping": {
+              "email_address": "urn:oid:0.9.2342.19200300.100.1.3",
+              "first_name": "urn:oid:2.5.4.42",
+              "last_name": "urn:oid:2.5.4.4",
+              "provider_user_id": "nameid"
+            },
+            "saml_idp_entity_id": "https://idp.acme.example/saml/metadata",
+            "saml_sso_url": "https://idp.acme.example/saml/sso",
+            "saml_idp_certificate": "-----BEGIN CERTIFICATE-----\nMIID...\n-----END CERTIFICATE-----",
+            "saml_signing_algorithm": "RSA_SHA256",
+            "saml_audience_uri": "https://acme.authn.sh/v1/saml/entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA/metadata",
+            "saml_acs_url": "https://acme.authn.sh/v1/saml/entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA/acs",
+            "saml_sp_entity_id": "https://acme.authn.sh/v1/saml/entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA/metadata",
+            "oidc_issuer": null,
+            "oidc_discovery_endpoint": null,
+            "oidc_client_id": null,
+            "oidc_scopes": [],
+            "oidc_redirect_uri": null,
+            "created_at": 1714723000000,
+            "updated_at": 1714723000000
+          },
+          {
+            "id": "entcon_01HKX9SY9V7H7TF8C8K7J9X4ZC",
+            "object": "enterprise_connection",
+            "protocol": "oidc",
+            "name": "Acme Azure AD",
+            "enabled": true,
+            "organization_id": "org_01HKX9SY9V7H7TF8C8K7J9X4ZB",
+            "domains": [
+              "acme.example",
+              "acme-corp.example"
+            ],
+            "default_role": "org:member",
+            "attribute_mapping": {
+              "email_address": "email",
+              "first_name": "given_name",
+              "last_name": "family_name",
+              "provider_user_id": "sub"
+            },
+            "saml_idp_entity_id": null,
+            "saml_sso_url": null,
+            "saml_idp_certificate": null,
+            "saml_signing_algorithm": null,
+            "saml_audience_uri": null,
+            "saml_acs_url": null,
+            "saml_sp_entity_id": null,
+            "oidc_issuer": "https://login.microsoftonline.com/acme-tenant/v2.0",
+            "oidc_discovery_endpoint": "https://login.microsoftonline.com/acme-tenant/v2.0/.well-known/openid-configuration",
+            "oidc_client_id": "11111111-2222-3333-4444-555555555555",
+            "oidc_scopes": [
+              "openid",
+              "profile",
+              "email"
+            ],
+            "oidc_redirect_uri": "https://acme.authn.sh/v1/enterprise-sso-callback",
+            "created_at": 1714723000000,
+            "updated_at": 1714723000000
+          },
+          {
+            "id": "entcon_01HKX9SY9V7H7TF8C8K7J9X4ZD",
+            "object": "enterprise_connection",
+            "protocol": "oidc",
+            "name": "Workspace-wide Okta",
+            "enabled": true,
+            "organization_id": null,
+            "domains": [
+              "staff.example"
+            ],
+            "default_role": "org:member",
+            "attribute_mapping": {
+              "email_address": "email",
+              "first_name": "given_name",
+              "last_name": "family_name",
+              "provider_user_id": "sub"
+            },
+            "saml_idp_entity_id": null,
+            "saml_sso_url": null,
+            "saml_idp_certificate": null,
+            "saml_signing_algorithm": null,
+            "saml_audience_uri": null,
+            "saml_acs_url": null,
+            "saml_sp_entity_id": null,
+            "oidc_issuer": "https://staff-corp.okta.com",
+            "oidc_discovery_endpoint": "https://staff-corp.okta.com/.well-known/openid-configuration",
+            "oidc_client_id": "0oa1abcdEFGHIJKLM2x7",
+            "oidc_scopes": [
+              "openid",
+              "profile",
+              "email",
+              "groups"
+            ],
+            "oidc_redirect_uri": "https://staff.authn.sh/v1/enterprise-sso-callback",
+            "created_at": 1714723000000,
+            "updated_at": 1714723000000
+          }
+        ]
+      },
+      "EnterpriseConnectionRequest": {
+        "type": "object",
+        "description": "Request body for `POST /v1/enterprise-connections` and\n`PATCH /v1/enterprise-connections/{id}`. Mirrors `EnterpriseConnection`\nminus the server-computed fields (`id`, `object`, `saml_acs_url`,\n`saml_sp_entity_id`, `oidc_redirect_uri`, `created_at`, `updated_at`)\nand adds the write-only secrets (`oidc_client_secret`,\n`saml_signing_key`).\n\n### POST vs PATCH\n\n- On `POST`, `protocol`, `name` are always required.\n  `organization_id` is required (use `null` for instance-wide).\n  For `protocol: \"saml\"` the operator must supply `saml_idp_entity_id`,\n  `saml_sso_url`, and `saml_idp_certificate`.\n  For `protocol: \"oidc\"` the operator must supply `oidc_issuer` and\n  `oidc_client_id`. `oidc_client_secret` is required on `POST` unless\n  the IdP supports PKCE-only public clients.\n- On `PATCH`, every field is optional. `protocol` and\n  `organization_id` are immutable — sending a different value returns\n  `422`.\n\n### Write-only secrets\n\n- `oidc_client_secret` — OIDC client secret. Omit on PATCH to leave\n  the stored value unchanged. Send `null` on PATCH to clear it (when\n  migrating to PKCE).\n- `saml_signing_key` — PEM-encoded private key the SP uses to sign\n  SAML AuthnRequests / LogoutRequests. Optional on POST (the platform\n  can generate one on demand). Omit on PATCH to keep the stored key;\n  send `null` to clear and regenerate.\n\nBoth fields are encrypted at rest and never returned by any response.\n",
+        "additionalProperties": false,
+        "properties": {
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "saml",
+              "oidc"
+            ],
+            "description": "Required on `POST`; immutable on `PATCH`.\n"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "enabled": {
+            "type": "boolean",
+            "default": true
+          },
+          "organization_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Required on `POST` (use `null` for instance-wide). Immutable on\n`PATCH`.\n"
+          },
+          "domains": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "hostname"
+            },
+            "description": "Verified domains routed to this connection. Each entry must\nalready exist as a verified `OrganizationDomain` (org-scoped\nconnections) or workspace-verified domain (instance-wide). Sending\nan unverified domain returns `422 enterprise_connection_domain_unverified`.\n"
+          },
+          "default_role": {
+            "type": "string",
+            "description": "`Role.key` assigned to JIT-provisioned `OrganizationMembership`\nrows. Defaults to `org:member`. Ignored for instance-wide\nconnections.\n"
+          },
+          "attribute_mapping": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Override the server-supplied defaults. Keys: `email_address`,\n`first_name`, `last_name`, `provider_user_id`, `organization_role`.\n"
+          },
+          "saml_idp_entity_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Required on `POST` for `protocol: \"saml\"`. `null` for OIDC.\n"
+          },
+          "saml_sso_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "Required on `POST` for `protocol: \"saml\"`. `null` for OIDC.\n"
+          },
+          "saml_idp_certificate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "PEM-encoded X.509 certificate. Required on `POST` for\n`protocol: \"saml\"`. `null` for OIDC.\n"
+          },
+          "saml_signing_algorithm": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "RSA_SHA256",
+              "RSA_SHA384",
+              "RSA_SHA512",
+              null
+            ],
+            "description": "Defaults to `RSA_SHA256` for SAML connections.\n"
+          },
+          "saml_audience_uri": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Defaults to the computed `saml_sp_entity_id`. Override for IdPs\nthat pin audience to a custom URI.\n"
+          },
+          "saml_signing_key": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "writeOnly": true,
+            "description": "Write-only. PEM-encoded private key for signing AuthnRequests /\nLogoutRequests. Optional on POST (platform generates one when\nomitted). Send `null` on PATCH to clear and regenerate.\n"
+          },
+          "oidc_issuer": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "Required on `POST` for `protocol: \"oidc\"`. `null` for SAML.\n"
+          },
+          "oidc_discovery_endpoint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri",
+            "description": "Optional override for `<oidc_issuer>/.well-known/openid-configuration`.\n"
+          },
+          "oidc_client_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Required on `POST` for `protocol: \"oidc\"`. `null` for SAML.\n"
+          },
+          "oidc_client_secret": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "writeOnly": true,
+            "maxLength": 1024,
+            "description": "Write-only OIDC client secret. Required on `POST` for\n`protocol: \"oidc\"` unless the IdP supports PKCE-only public\nclients. Omit on PATCH to keep the stored value; send `null` to\nclear it. Encrypted at rest; never returned.\n"
+          },
+          "oidc_scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Overrides the default `[\"openid\", \"profile\", \"email\"]` for OIDC\nconnections.\n"
+          }
+        },
+        "examples": [
+          {
+            "protocol": "saml",
+            "name": "Acme Okta",
+            "organization_id": "org_01HKX9SY9V7H7TF8C8K7J9X4ZB",
+            "domains": [
+              "acme.example"
+            ],
+            "saml_idp_entity_id": "https://idp.acme.example/saml/metadata",
+            "saml_sso_url": "https://idp.acme.example/saml/sso",
+            "saml_idp_certificate": "-----BEGIN CERTIFICATE-----\nMIID...\n-----END CERTIFICATE-----",
+            "attribute_mapping": {
+              "email_address": "urn:oid:0.9.2342.19200300.100.1.3",
+              "provider_user_id": "nameid"
+            }
+          },
+          {
+            "protocol": "oidc",
+            "name": "Acme Azure AD",
+            "organization_id": "org_01HKX9SY9V7H7TF8C8K7J9X4ZB",
+            "domains": [
+              "acme.example",
+              "acme-corp.example"
+            ],
+            "oidc_issuer": "https://login.microsoftonline.com/acme-tenant/v2.0",
+            "oidc_client_id": "11111111-2222-3333-4444-555555555555",
+            "oidc_client_secret": "shhhh",
+            "oidc_scopes": [
+              "openid",
+              "profile",
+              "email"
+            ]
+          },
+          {
+            "protocol": "oidc",
+            "name": "Workspace-wide Okta",
+            "organization_id": null,
+            "domains": [
+              "staff.example"
+            ],
+            "oidc_issuer": "https://staff-corp.okta.com",
+            "oidc_client_id": "0oa1abcdEFGHIJKLM2x7",
+            "oidc_client_secret": "shhhh",
+            "oidc_scopes": [
+              "openid",
+              "profile",
+              "email",
+              "groups"
+            ],
+            "default_role": "org:member"
+          }
+        ]
+      },
+      "EnterpriseConnectionTestResult": {
+        "type": "object",
+        "description": "Result of `POST /v1/enterprise-connections/{id}/test`. The dashboard\nuses this shape to render a per-connection health indicator on the\nEnterprise SSO configuration page. Always returned with HTTP `200`\neven when probes fail — inspect `errors[]` to decide pass/fail.\n\nFor `protocol: \"oidc\"` connections, the server probes\n`oidc_discovery_endpoint` (resolved from `oidc_issuer`) and surfaces\nthe HTTP status code on `discovery_status`. For `protocol: \"saml\"`\nconnections, the server fetches the IdP metadata XML from\n`saml_idp_entity_id` (when the URL form is supplied), parses it, and\nsignature-verifies it; `discovery_status` carries the HTTP status of\nthe metadata fetch.\n",
+        "required": [
+          "authorize_url",
+          "discovery_status",
+          "errors"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "authorize_url": {
+            "type": "string",
+            "description": "The fully-formed IdP authorize URL the SDK would redirect a user\nto right now (with a synthetic `state` and the per-connection\nACS / redirect URI baked in). For SAML connections, the\n`<AuthnRequest>` deflated + base64-encoded + appended to\n`saml_sso_url` as `SAMLRequest=…`. For OIDC, the standard\n`/authorize?response_type=code&…` URL.\n\nEmpty string when the server could not build the URL (e.g. OIDC\ndiscovery refresh failed and no cached endpoint exists, or SAML\nmetadata parsing failed).\n",
+            "examples": [
+              "https://idp.acme.example/saml/sso?SAMLRequest=fVJBb%2FIwDP0r...",
+              "https://login.microsoftonline.com/acme-tenant/v2.0/authorize?response_type=code&client_id=11111111-2222-3333-4444-555555555555&redirect_uri=https%3A%2F%2Facme.authn.sh%2Fv1%2Fenterprise-sso-callback&scope=openid+profile+email&state=test_01HKX9SY9V7H7TF8C8K7J9X4ZA"
+            ]
+          },
+          "discovery_status": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 100,
+            "maximum": 599,
+            "description": "HTTP status code returned by the discovery probe. For OIDC, the\n`GET <oidc_discovery_endpoint>` response code (`200` = healthy).\nFor SAML, the `GET <saml_idp_entity_id>` metadata fetch (when\nthe URL form is supplied). `null` when no discovery URL is\nconfigured for the connection.\n"
+          },
+          "errors": {
+            "type": "array",
+            "description": "Collected probe errors. Empty when every check passed. Each\nentry uses the standard `Error` shape (`code` is a stable\nmachine-readable token; SDKs match on it).\n",
+            "items": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "examples": [
+          {
+            "authorize_url": "https://idp.acme.example/saml/sso?SAMLRequest=fVJBb%2FIwDP0r...",
+            "discovery_status": 200,
+            "errors": []
+          },
+          {
+            "authorize_url": "https://login.microsoftonline.com/acme-tenant/v2.0/authorize?response_type=code&client_id=11111111-2222-3333-4444-555555555555&redirect_uri=https%3A%2F%2Facme.authn.sh%2Fv1%2Fenterprise-sso-callback&scope=openid+profile+email&state=test_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+            "discovery_status": 200,
+            "errors": []
+          },
+          {
+            "authorize_url": "",
+            "discovery_status": 502,
+            "errors": [
+              {
+                "code": "enterprise_connection_discovery_unreachable",
+                "message": "Could not reach the OIDC discovery endpoint",
+                "long_message": "The IdP's /.well-known/openid-configuration endpoint returned 502. Verify the issuer URL and that authn.sh can reach the IdP."
+              }
+            ]
+          },
+          {
+            "authorize_url": "",
+            "discovery_status": null,
+            "errors": [
+              {
+                "code": "enterprise_connection_saml_metadata_invalid",
+                "message": "SAML metadata did not parse",
+                "long_message": "Fetched the IdP metadata XML but signature verification failed. Verify saml_idp_certificate matches the IdP's signing key."
+              }
+            ]
+          }
+        ]
+      },
+      "EnterpriseAccount": {
+        "type": "object",
+        "description": "A `User`'s persistent link to an `EnterpriseConnection`. Replaces the\nlegacy `SamlAccount` shape with one resource covering both SAML and\nOIDC enterprise-IdP links — the parent `EnterpriseConnection.protocol`\nfield discriminates.\n\nCreated by `/v1/saml/{id}/acs` (SAML) or `/v1/enterprise-sso-callback`\n(OIDC) on the first successful enterprise-SSO sign-in and reused on\nevery subsequent sign-in via the same connection. Surfaced in\n`User.enterprise_accounts[]`.\n\n### Public surface only\n\nThe IdP-issued OIDC `id_token` is encrypted at rest and **never**\nappears in any payload. The SAML assertion XML is discarded after\nsignature verification (only the parsed attributes survive on\n`public_metadata`). The SDK has no way to read either; sign-in\nresumption uses the platform's own session cookie, not the IdP's\ntokens.\n\n### What the IdP told us\n\n- `provider_user_id` — the IdP's stable subject:\n  - SAML — the `NameID` of the assertion's `Subject` (typically\n    `urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress` or\n    `urn:oasis:names:tc:SAML:2.0:nameid-format:persistent`).\n  - OIDC — the `sub` claim of the ID token.\n- `email_address` — email returned by the IdP. Stored verbatim. May\n  or may not match a verified `EmailAddress` on the parent `User`;\n  the resolver de-dupes when `verified` is `true`.\n- `verified` — `true` when the IdP confirmed the email:\n  - OIDC — mapped from the `email_verified` claim (or the\n    `EnterpriseConnection.attribute_mapping` override).\n  - SAML — `true` when the IdP asserted an email-verified attribute\n    (or one mapped via `attribute_mapping`); otherwise defaults to\n    `true` for first-party enterprise IdPs and `false` for federated\n    ones, per workspace policy.\n- `public_metadata` — raw IdP attributes / claims that didn't map to\n  a `User` field. Useful for IdP-specific extras (e.g. `groups[]`,\n  `department`, `cost_center`).\n\n### Identifier\n\nID prefix `entacc_` (e.g. `entacc_01HKX9SY9V7H7TF8C8K7J9X4ZA`).\n",
+        "required": [
+          "id",
+          "object",
+          "enterprise_connection_id",
+          "provider_user_id",
+          "email_address",
+          "verified",
+          "public_metadata",
+          "linked_at",
+          "last_signed_in_at",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "object": {
+            "type": "string",
+            "const": "enterprise_account"
+          },
+          "enterprise_connection_id": {
+            "description": "`EnterpriseConnection.id` this row links to. Survives connection\ndeletion (the row stays so audit trails remain readable, but\nsign-in via that connection stops working).\n",
+            "$ref": "#/components/schemas/Id"
+          },
+          "provider_user_id": {
+            "type": "string",
+            "maxLength": 255,
+            "description": "SAML `NameID` or OIDC `sub` — the IdP's stable subject identifier\nfor this user. Unique per `EnterpriseConnection`.\n"
+          },
+          "email_address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "email",
+            "maxLength": 254,
+            "description": "Email the IdP returned. `null` for IdPs that omit the email\nattribute (rare in enterprise settings; the resolver typically\nrejects the assertion when this is missing).\n"
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "`true` when the IdP confirmed the email as verified. For OIDC,\nmapped from `email_verified` (or the `attribute_mapping`\noverride). For SAML, mapped from the connection's verified-flag\nattribute when present; defaults per workspace policy otherwise.\nWhen `true`, the resolver attaches the email to the parent\n`User`'s `email_addresses[]` automatically.\n"
+          },
+          "public_metadata": {
+            "$ref": "#/components/schemas/Metadata",
+            "description": "Raw IdP attributes / claims that did not map to any `User` /\n`EnterpriseAccount` field via\n`EnterpriseConnection.attribute_mapping`. Free-form bag (e.g.\n`groups`, `department`, `cost_center`).\n"
+          },
+          "linked_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "last_signed_in_at": {
+            "description": "Timestamp of the most recent sign-in via this enterprise\nconnection. `null` until the second sign-in (the first is\ncaptured by `linked_at`).\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "updated_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          }
+        },
+        "examples": [
+          {
+            "id": "entacc_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+            "object": "enterprise_account",
+            "enterprise_connection_id": "entcon_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+            "provider_user_id": "alice@acme.example",
+            "email_address": "alice@acme.example",
+            "verified": true,
+            "public_metadata": {
+              "groups": [
+                "engineering",
+                "sso-admins"
+              ],
+              "department": "Platform"
+            },
+            "linked_at": 1714723000000,
+            "last_signed_in_at": 1714896500000,
+            "created_at": 1714723000000,
+            "updated_at": 1714896500000
+          },
+          {
+            "id": "entacc_01HKX9SY9V7H7TF8C8K7J9X4ZB",
+            "object": "enterprise_account",
+            "enterprise_connection_id": "entcon_01HKX9SY9V7H7TF8C8K7J9X4ZC",
+            "provider_user_id": "00uabcdEFGHIJKLM2x7",
+            "email_address": "bob@acme.example",
+            "verified": true,
+            "public_metadata": {
+              "groups": [
+                "Domain Users"
+              ]
+            },
+            "linked_at": 1714724000000,
+            "last_signed_in_at": null,
+            "created_at": 1714724000000,
+            "updated_at": 1714724000000
+          }
+        ]
+      },
       "SmsTemplate": {
         "type": "object",
         "description": "Per-environment SMS body customization for one of a fixed set of\noutbound message slugs (verification codes, password resets,\ninvitations). Each environment is seeded with a default row per slug\non creation; operators edit the body or flip `delivered_by_us` to\nhand off sending to their own webhook.\n\n### Slugs\n\n- `verification_code` — first-factor sign-up phone verification\n  + standalone `PhoneNumber` verification + second-factor SMS MFA.\n  The `phone_code` strategy renders this template.\n- `reset_password_code` — SMS variant of the password-reset flow\n  (when the env's `reset_password` strategy is configured to use\n  SMS rather than email). Reserved for v0.5; the row exists in\n  v0.4 so operators can prep their copy.\n- `invitation` — operator-driven invitation SMS. Mirrors\n  `Invitation` (v0.1) but for phone-based invites; reserved for\n  v0.5.\n\n### Body templating\n\n`body` is a Liquid-style template with `{{placeholder}}`\ninterpolation. Standard placeholders:\n\n- `{{otp_code}}` — the 6-digit numeric code (verification +\n  reset).\n- `{{app.name}}` — the environment's `display_config.application_name`.\n- `{{app.url}}` — the environment's `display_config.home_url`.\n- `{{user.first_name}}` / `{{user.last_name}}` — when the message\n  has a known recipient.\n- `{{ttl_minutes}}` — how long the code remains valid (currently\n  fixed at 10 minutes for `verification_code`).\n\nUnknown placeholders render as the empty string.\n\n### `delivered_by_us`\n\nWhen `true` (default), authn.sh's SMS engine sends the message via\nthe env's `Environment.sms.driver`. When `false`, the engine emits\nan `sms.queued` audit-log entry and a webhook event but does not\ncall any driver — the operator's webhook handler is expected to\ntake over and send the SMS through their own carrier relationship.\n\n### Identifier\n\nID prefix `tmpl_` (e.g. `tmpl_01HKX9SY9V7H7TF8C8K7J9X4ZA`). Shared\nwith future `EmailTemplate` rows.\n",
@@ -10783,6 +13631,454 @@
           {
             "body": "{{user.first_name}}, your one-time code: {{otp_code}}",
             "from_number_override": "+15555550100"
+          }
+        ]
+      },
+      "PhoneNumberCreateRequest": {
+        "type": "object",
+        "description": "Body for `POST /v1/me/phone-numbers`. Mirrors `EmailAddressCreateRequest`\nin shape — only the raw value is supplied; the server normalises\nto E.164, mints the row in `verified: false`, and the SDK then\nissues a `phone_code` `Challenge` against it.\n\nOperators can also create rows admin-side via BAPI (covered by\n`SP-2` / a future BAPI path); that body adds `user_id`, `verified`,\nand `primary` knobs analogous to `EmailAddressCreateRequest`.\n",
+        "required": [
+          "phone_number"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "phone_number": {
+            "type": "string",
+            "maxLength": 32,
+            "description": "Submitted phone number. Accepts any input the server-side parser\ncan normalise to E.164 (leading `+`, country-code digits,\nsubscriber digits). The stored value is always E.164.\n",
+            "examples": [
+              "+15555550100",
+              "+55 11 99999-0100"
+            ]
+          }
+        }
+      },
+      "PhoneNumberUpdateRequest": {
+        "type": "object",
+        "description": "Body for `PATCH /v1/me/phone-numbers/{id}`. Only the supplied keys\nare updated. The phone-number value itself is **not** patchable —\nto change a number, add a new row and remove the old one (mirrors\n`EmailAddress`).\n\n### Flag interactions\n\n- Setting `is_primary: true` flips this row to the user's primary\n  phone (and clears `is_primary` on every other row). Setting\n  `is_primary: false` is rejected when this row is the only\n  verified primary candidate.\n- Setting `reserved_for_second_factor: false` while\n  `default_second_factor` is `true` also clears\n  `default_second_factor` (a phone can only be the default second\n  factor while reserved for MFA).\n- Setting `default_second_factor: true` requires\n  `reserved_for_second_factor: true` (either already set, or set in\n  the same patch); the server returns `422` otherwise. Only one\n  phone per user can carry `default_second_factor: true` — flipping\n  the flag on a new row clears it on every other row.\n",
+        "additionalProperties": false,
+        "properties": {
+          "is_primary": {
+            "type": "boolean",
+            "description": "When `true`, make this row the user's primary phone. The number\nmust be `verified: true`.\n"
+          },
+          "reserved_for_second_factor": {
+            "type": "boolean",
+            "description": "When `true`, commit this phone to second-factor MFA. The number\nmust be `verified: true`.\n"
+          },
+          "default_second_factor": {
+            "type": "boolean",
+            "description": "When `true`, prefer this phone as the user's default second\nfactor on `needs_second_factor`. Requires\n`reserved_for_second_factor: true`.\n"
+          }
+        }
+      },
+      "PasskeyCreationOptions": {
+        "type": "object",
+        "description": "Server-built `PublicKeyCredentialCreationOptions` envelope for a\nWebAuthn registration ceremony. Mirrors the WebAuthn L3 spec\nshape, base64url-encoded where the spec uses `BufferSource`. The\nSDK passes this verbatim to\n`navigator.credentials.create({ publicKey })` after URL-safe\nbase64 decoding `challenge`, `user.id`, and every\n`exclude_credentials[].id`.\n\nCarried on a `Challenge` body (the registration challenge created\nby `POST /v1/me/passkeys/begin-registration`) so multi-tab clients\ncan resume the ceremony by re-reading the parent challenge.\n",
+        "required": [
+          "rp",
+          "user",
+          "challenge",
+          "pub_key_cred_params",
+          "timeout",
+          "attestation",
+          "authenticator_selection",
+          "exclude_credentials"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "rp": {
+            "type": "object",
+            "required": [
+              "id",
+              "name"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "RP ID — the effective domain the credential is scoped to\n(e.g. `acme.com`). Matches `Environment.host` minus the\n`<env_slug>.` subdomain unless the operator overrode it.\n"
+              },
+              "name": {
+                "type": "string",
+                "description": "Human-readable RP name displayed by the authenticator UI."
+              }
+            }
+          },
+          "user": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "display_name"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Opaque, per-environment, per-user handle. base64url-encoded\nbytes — not the `User.id` ULID directly; surfacing the\nULID would leak it to the authenticator.\n"
+              },
+              "name": {
+                "type": "string",
+                "description": "Username the authenticator may display alongside the RP\nname (typically the user's primary email).\n"
+              },
+              "display_name": {
+                "type": "string",
+                "description": "Human-readable name the authenticator may show\n(typically `first_name + last_name`).\n"
+              }
+            }
+          },
+          "challenge": {
+            "type": "string",
+            "description": "base64url-encoded server nonce. The browser includes it in\nthe attestation response; the server checks it on\n`complete-registration` to bind the response to this exact\nceremony.\n"
+          },
+          "pub_key_cred_params": {
+            "type": "array",
+            "description": "Algorithms the server will accept, in operator-preference\norder. Mirrors WebAuthn `PublicKeyCredentialParameters`.\n",
+            "items": {
+              "type": "object",
+              "required": [
+                "type",
+                "alg"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "const": "public-key"
+                },
+                "alg": {
+                  "type": "integer",
+                  "description": "COSE algorithm identifier. Common values: `-7` (ES256),\n`-257` (RS256), `-8` (EdDSA).\n",
+                  "examples": [
+                    -7,
+                    -257
+                  ]
+                }
+              }
+            }
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Ceremony timeout in milliseconds. Hint to the browser; not enforced server-side.",
+            "examples": [
+              60000
+            ]
+          },
+          "attestation": {
+            "type": "string",
+            "enum": [
+              "none",
+              "indirect",
+              "direct",
+              "enterprise"
+            ],
+            "default": "none",
+            "description": "Attestation conveyance preference. Defaults to `none` because\nthe server doesn't validate authenticator provenance in v0.5.\n"
+          },
+          "authenticator_selection": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "resident_key",
+              "user_verification"
+            ],
+            "properties": {
+              "authenticator_attachment": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "enum": [
+                  "platform",
+                  "cross-platform",
+                  null
+                ],
+                "description": "When set, restricts registration to platform (Touch ID,\nWindows Hello) or cross-platform (roaming security key)\nauthenticators. `null` allows both.\n"
+              },
+              "resident_key": {
+                "type": "string",
+                "enum": [
+                  "discouraged",
+                  "preferred",
+                  "required"
+                ],
+                "default": "preferred",
+                "description": "How strongly the server wants a client-side discoverable\ncredential. `preferred` is the v0.5 default — enables\nusername-less sign-in when the authenticator supports it\nwhile falling back gracefully when it doesn't.\n"
+              },
+              "user_verification": {
+                "type": "string",
+                "enum": [
+                  "discouraged",
+                  "preferred",
+                  "required"
+                ],
+                "default": "preferred",
+                "description": "Whether the authenticator must do user-presence checking\n(PIN, biometric, …). `preferred` accepts UV when available;\n`required` refuses authenticators that can't UV.\n"
+              }
+            }
+          },
+          "exclude_credentials": {
+            "type": "array",
+            "description": "Credentials already registered against this user. The\nauthenticator refuses to enroll if any match, so the user\ndoesn't accidentally register the same authenticator twice.\n",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "type"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "base64url credential id of an existing `Passkey` row."
+                },
+                "type": {
+                  "type": "string",
+                  "const": "public-key"
+                },
+                "transports": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "usb",
+                      "nfc",
+                      "ble",
+                      "internal",
+                      "hybrid"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "extensions": {
+            "type": "object",
+            "description": "WebAuthn extension inputs (e.g. `credProps`). Free-form — the\nserver passes the operator-configured set through verbatim.\n",
+            "additionalProperties": true
+          }
+        }
+      },
+      "PasskeyRequestOptions": {
+        "type": "object",
+        "description": "Server-built `PublicKeyCredentialRequestOptions` envelope for a\nWebAuthn authentication ceremony. Mirrors the WebAuthn L3 spec\nshape, base64url-encoded where the spec uses `BufferSource`.\n\nCarried on a `Challenge` body when the parent flow's\n`current_challenge_id` references a passkey first-factor\nchallenge. The SDK passes this verbatim to\n`navigator.credentials.get({ publicKey })` after base64url\ndecoding `challenge` and every `allow_credentials[].id`.\n",
+        "required": [
+          "rp_id",
+          "challenge",
+          "timeout",
+          "allow_credentials",
+          "user_verification"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "rp_id": {
+            "type": "string",
+            "description": "RP ID the credentials are scoped to. Must match the value the\nauthenticator saw at registration; the assertion will fail\notherwise.\n"
+          },
+          "challenge": {
+            "type": "string",
+            "description": "base64url-encoded server nonce. The browser includes it in\nthe assertion response's `clientDataJSON`; the server checks\nit on `answer` to bind the response to this ceremony.\n"
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Ceremony timeout in milliseconds. Hint to the browser; not enforced server-side.",
+            "examples": [
+              60000
+            ]
+          },
+          "allow_credentials": {
+            "type": "array",
+            "description": "Credentials the server will accept. Filled from the resolved\nuser's verified `Passkey` rows (in `last_used_at desc`\norder). Empty means \"any discoverable credential is\nacceptable\" — used when the SDK opens the ceremony in\nusername-less mode.\n",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "type"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "description": "base64url credential id of a verified `Passkey` row."
+                },
+                "type": {
+                  "type": "string",
+                  "const": "public-key"
+                },
+                "transports": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "usb",
+                      "nfc",
+                      "ble",
+                      "internal",
+                      "hybrid"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "user_verification": {
+            "type": "string",
+            "enum": [
+              "required",
+              "preferred",
+              "discouraged"
+            ],
+            "default": "preferred",
+            "description": "Whether the authenticator must do user-presence checking\n(PIN, biometric, …). Mirrors the environment policy; the\nserver rejects the assertion if the returned authenticator\ndata doesn't satisfy this.\n"
+          },
+          "extensions": {
+            "type": "object",
+            "description": "WebAuthn extension inputs. Free-form pass-through.",
+            "additionalProperties": true
+          }
+        }
+      },
+      "PasskeyAssertion": {
+        "type": "object",
+        "description": "WebAuthn `AuthenticatorAssertionResponse` envelope posted back to\nthe server after `navigator.credentials.get(...)` completes.\nBinary fields are base64url-encoded.\n",
+        "required": [
+          "id",
+          "raw_id",
+          "response",
+          "type"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "base64url credential id the authenticator selected to answer with."
+          },
+          "raw_id": {
+            "type": "string",
+            "description": "base64url-encoded credential id. Mirrors `id`."
+          },
+          "response": {
+            "type": "object",
+            "required": [
+              "client_data_json",
+              "authenticator_data",
+              "signature"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "client_data_json": {
+                "type": "string",
+                "description": "base64url of the `clientDataJSON` blob the browser\nproduced. The server decodes it, checks `type ==\n\"webauthn.get\"`, the embedded `challenge` matches the\nceremony, and the `origin` is on the allowlist.\n"
+              },
+              "authenticator_data": {
+                "type": "string",
+                "description": "base64url of the authenticator data. The server parses it\nto confirm RP-ID hash, user-presence / user-verification\nflags, and the monotonic `sign_count`.\n"
+              },
+              "signature": {
+                "type": "string",
+                "description": "base64url of the assertion signature over\n`authenticator_data || sha256(clientDataJSON)`, verified\nagainst the stored public key for the credential id.\n"
+              },
+              "user_handle": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "base64url of the user handle (the per-user opaque id\nstored at registration). Present when the authenticator\nsupports discoverable credentials; the server uses it to\nresolve the user when `allow_credentials[]` was empty\n(username-less sign-in).\n"
+              }
+            }
+          },
+          "type": {
+            "type": "string",
+            "const": "public-key"
+          }
+        }
+      },
+      "ScimToken": {
+        "type": "object",
+        "description": "Bearer token issued to an IdP's SCIM agent. The IdP pastes the\nplaintext into its provisioning configuration; subsequent IdP-side\nrequests authenticate against `/scim/v2/*` with\n`Authorization: Bearer <token>`.\n\n### Single-shot plaintext\n\nThe full plaintext token is **only** returned by `POST\n/v1/organizations/{org_id}/scim/tokens` (the issue endpoint), and\nonly on the response body. Every subsequent read exposes the\n`prefix` only — there is no way to recover the plaintext after the\ninitial response is consumed. Operators must store the value at\nissue time or rotate.\n\n### Identifier prefixes\n\n- Row id prefix: `scimt_` (e.g.\n  `scimt_01HKX9SY9V7H7TF8C8K7J9X4ZA`).\n- Plaintext token prefix: `scim_` followed by base32-encoded random\n  bytes (e.g. `scim_ULID0123456789…`).\n",
+        "required": [
+          "id",
+          "object",
+          "organization_id",
+          "name",
+          "prefix",
+          "created_at",
+          "revoked_at"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/Id"
+          },
+          "object": {
+            "type": "string",
+            "const": "scim_token"
+          },
+          "organization_id": {
+            "description": "`Organization.id` this token is scoped to. SCIM requests\nauthenticated with this token can only touch users + groups\nwithin this org's `EnterpriseConnection`-provisioned\npopulation.\n",
+            "$ref": "#/components/schemas/Id"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "description": "Operator-chosen label rendered in the dashboard. Useful to\ntell multiple IdPs apart on the same org.\n"
+          },
+          "prefix": {
+            "type": "string",
+            "description": "First 12 characters of the plaintext (`scim_xxxxxxxx`) for\noperator-visible identification. The remaining bytes are\nstored as a hash.\n",
+            "examples": [
+              "scim_01HKX9SY"
+            ]
+          },
+          "token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "writeOnly": true,
+            "description": "Full plaintext token. Populated only on the response to `POST\n/v1/organizations/{org_id}/scim/tokens`; **never returned by\nany GET**. `null` on every list / read response.\n",
+            "examples": [
+              "scim_01HKX9SYABCDEFGHJKMNPQRSTVWXYZ234567"
+            ]
+          },
+          "created_at": {
+            "$ref": "#/components/schemas/Timestamp"
+          },
+          "revoked_at": {
+            "description": "Set when `POST /scim/tokens/{id}/revoke` succeeds. Once set,\nthe token is rejected on every `/scim/v2/*` request with\n`401 invalidVers`. `null` while the token is active.\n",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Timestamp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "examples": [
+          {
+            "id": "scimt_01HKX9SY9V7H7TF8C8K7J9X4ZA",
+            "object": "scim_token",
+            "organization_id": "org_01HKX9SY9V7H7TF8C8K7J9X4ZB",
+            "name": "Okta — Production",
+            "prefix": "scim_01HKX9SY",
+            "created_at": 1714723000000,
+            "revoked_at": null
+          },
+          {
+            "id": "scimt_01HKX9SY9V7H7TF8C8K7J9X4ZC",
+            "object": "scim_token",
+            "organization_id": "org_01HKX9SY9V7H7TF8C8K7J9X4ZB",
+            "name": "Okta — Production (rotated)",
+            "prefix": "scim_01HKX9TT",
+            "token": "scim_01HKX9TTABCDEFGHJKMNPQRSTVWXYZ234567",
+            "created_at": 1714724000000,
+            "revoked_at": null
           }
         ]
       }

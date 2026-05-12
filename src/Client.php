@@ -8,6 +8,7 @@ use Authn\Sdk\Http\Transport;
 use Authn\Sdk\Resources\AllowlistIdentifiersManager;
 use Authn\Sdk\Resources\AppearanceManager;
 use Authn\Sdk\Resources\BlocklistIdentifiersManager;
+use Authn\Sdk\Resources\EnterpriseConnectionsManager;
 use Authn\Sdk\Resources\ExternalAccountsManager;
 use Authn\Sdk\Resources\InstanceManager;
 use Authn\Sdk\Resources\InvitationsManager;
@@ -116,6 +117,11 @@ final class Client
     public function oauthProviders(): OauthProvidersManager
     {
         return new OauthProvidersManager($this->transport);
+    }
+
+    public function enterpriseConnections(): EnterpriseConnectionsManager
+    {
+        return new EnterpriseConnectionsManager($this->transport);
     }
 
     public function smsTemplates(): SmsTemplatesManager
