@@ -37,6 +37,8 @@ final class VerifiedClaims
         public readonly ?string $defaultSecondFactor = null,
         public readonly bool $passkeyVerified = false,
         public readonly int $passkeyCount = 0,
+        public readonly ?string $enterpriseConnectionId = null,
+        public readonly ?string $enterpriseAccountId = null,
     ) {}
 
     public function hasRole(string $key): bool
@@ -67,5 +69,10 @@ final class VerifiedClaims
     public function hasPasskey(): bool
     {
         return $this->passkeyCount > 0;
+    }
+
+    public function wasVerifiedByEnterpriseSso(): bool
+    {
+        return $this->enterpriseConnectionId !== null;
     }
 }

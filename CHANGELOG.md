@@ -6,6 +6,9 @@
 
 - `EnterpriseConnectionsManager` — BAPI binding for `/v1/enterprise-connections` (`list`, `create`, `get`, `update`, `delete`, `test`) plus the `EnterpriseConnection` DTO (carrying both SAML and OIDC fields, discriminated by `protocol`), `EnterpriseConnectionTestResult` + `EnterpriseConnectionTestError`, and `EnterpriseConnectionsListParams` (with the `organization_id` filter — pass an `Organization.id` for org-scoped rows, the literal `"null"` for instance-wide only, or omit for both). Accessible via `$client->enterpriseConnections()`. Write-only secrets (`oidc_client_secret`, `saml_signing_key`) are accepted on `create`/`update` and never returned on read.
 - `EnterpriseAccount` DTO — read-only shape for the per-user link to an `EnterpriseConnection`. Carries `provider_user_id`, `email_address`, `verified`, `public_metadata` (raw IdP attributes that did not map to a `User` field), `linked_at`, and `last_signed_in_at`. Exposed by the embedded `enterprise_accounts[]` array on `User`. The BAPI does not expose a top-level `/v1/enterprise-accounts` surface in v0.6 — enterprise accounts are managed by deleting the parent `EnterpriseConnection` or by removing the user.
+- `VerifiedClaims->enterpriseConnectionId: ?string` parsed from the `entcon` JWT claim — `EnterpriseConnection.id` of the IdP that minted the session. `null` when the session was authenticated by any non-enterprise strategy (password, oauth, passkey, etc.).
+- `VerifiedClaims->enterpriseAccountId: ?string` parsed from the `entacc` JWT claim — `EnterpriseAccount.id` linking the user to that connection. `null` for non-enterprise sessions.
+- `VerifiedClaims::wasVerifiedByEnterpriseSso()` helper. Returns `true` when `enterpriseConnectionId !== null` — the cheapest test for "this session went through SAML / OIDC enterprise SSO".
 
 ## [0.5.0] — 2026-05-11
 
